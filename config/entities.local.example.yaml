@@ -1,0 +1,13 @@
+# Copy this file to config/entities.local.yaml and replace the placeholder
+# entity IDs with the IDs shown in Home Assistant Developer Tools > States.
+# Do not commit config/entities.local.yaml.
+
+version: 1
+logical_entities:
+  presence_detected: binary_sensor.replace_me_presence_detected
+  movement_detected: binary_sensor.replace_me_movement_detected
+  still_presence_detected: binary_sensor.replace_me_still_presence_detected
+  target_distance: sensor.replace_me_target_distance
+  fall_detected: binary_sensor.replace_me_fall_detected
+  door_opened: binary_sensor.replace_me_door_opened
+  sensor_online: binary_sensor.replace_me_sensor_online

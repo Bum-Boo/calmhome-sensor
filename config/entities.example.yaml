@@ -1,0 +1,26 @@
+# Copy this file to config/entities.local.yaml for your own notes.
+# Home Assistant does not load this file automatically. Use these values to fill
+# the CalmHome entity mapping helpers or to edit the package defaults.
+
+version: 1
+logical_entities:
+  # mmWave or prebuilt presence sensor occupancy entity.
+  presence_detected: binary_sensor.calmhome_presence_detected
+
+  # Motion or moving-target entity. Movement is debounced in Home Assistant.
+  movement_detected: binary_sensor.calmhome_movement_detected
+
+  # Still target or static occupancy entity.
+  still_presence_detected: binary_sensor.calmhome_still_presence_detected
+
+  # Optional diagnostic distance entity. Hidden by default in the dashboard.
+  target_distance: sensor.calmhome_target_distance
+
+  # Fall status entity from MR60FDA2 or equivalent fall status sensor.
+  fall_detected: binary_sensor.calmhome_fall_detected
+
+  # Optional door contact entity.
+  door_opened: binary_sensor.calmhome_door_opened
+
+  # ESPHome status entity for the primary sensor.
+  sensor_online: binary_sensor.calmhome_sensor_online

@@ -1,14 +1,44 @@
-# calmhome-sensor Home Assistant package.
-#
-# Replace these entity IDs if your ESPHome devices produce different names:
-# - binary_sensor.calmhome_presence_detected
-# - binary_sensor.calmhome_movement_detected
-# - binary_sensor.calmhome_still_presence_detected
-# - sensor.calmhome_target_distance
-# - binary_sensor.calmhome_fall_detected
-# - binary_sensor.calmhome_sensor_online
-# - binary_sensor.calmhome_door_opened
+# calmhome-sensor core package.
+# Install calmhome_mock.yaml too when you want no-hardware testing.
 
+# ---------------------------------------------------------------------------
+# Entity mapping helpers
+# ---------------------------------------------------------------------------
+# Replace these defaults in the UI or edit this file to match your own entity IDs.
+# Use config/entities.example.yaml as the logical mapping checklist.
+input_text:
+  calmhome_entity_presence_detected:
+    name: CalmHome Entity Presence Detected
+    initial: binary_sensor.calmhome_presence_detected
+    max: 255
+  calmhome_entity_movement_detected:
+    name: CalmHome Entity Movement Detected
+    initial: binary_sensor.calmhome_movement_detected
+    max: 255
+  calmhome_entity_still_presence_detected:
+    name: CalmHome Entity Still Presence Detected
+    initial: binary_sensor.calmhome_still_presence_detected
+    max: 255
+  calmhome_entity_target_distance:
+    name: CalmHome Entity Target Distance
+    initial: sensor.calmhome_target_distance
+    max: 255
+  calmhome_entity_fall_detected:
+    name: CalmHome Entity Fall Detected
+    initial: binary_sensor.calmhome_fall_detected
+    max: 255
+  calmhome_entity_door_opened:
+    name: CalmHome Entity Door Opened
+    initial: binary_sensor.calmhome_door_opened
+    max: 255
+  calmhome_entity_sensor_online:
+    name: CalmHome Entity Sensor Online
+    initial: binary_sensor.calmhome_sensor_online
+    max: 255
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 input_boolean:
   calmhome_show_diagnostics:
     name: CalmHome Show Diagnostics
@@ -25,12 +55,100 @@ input_number:
     icon: mdi:timer-sand
     initial: 120
 
+input_datetime:
+  calmhome_last_activity_time_storage:
+    name: CalmHome Last Activity Time Storage
+    has_date: true
+    has_time: true
+
 template:
+  # -------------------------------------------------------------------------
+  # Binary sensors
+  # -------------------------------------------------------------------------
   - binary_sensor:
+      - name: CalmHome Presence Signal
+        unique_id: calmhome_presence_signal
+        device_class: occupancy
+        state: >-
+          {% set mock = is_state('input_boolean.calmhome_mock_mode', 'on') %}
+          {% set scenario = states('input_select.calmhome_mock_scenario') %}
+          {% set entity = states('input_text.calmhome_entity_presence_detected') %}
+          {% set valid = entity not in ['unknown', 'unavailable', 'none', ''] %}
+          {{
+            (mock and scenario in ['presence_detected', 'movement_detected', 'still_presence', 'fall_suspected', 'long_inactivity', 'door_opened'])
+            or (not mock and valid and is_state(entity, 'on'))
+          }}
+
+      - name: CalmHome Movement Signal
+        unique_id: calmhome_movement_signal
+        device_class: motion
+        state: >-
+          {% set mock = is_state('input_boolean.calmhome_mock_mode', 'on') %}
+          {% set scenario = states('input_select.calmhome_mock_scenario') %}
+          {% set entity = states('input_text.calmhome_entity_movement_detected') %}
+          {% set valid = entity not in ['unknown', 'unavailable', 'none', ''] %}
+          {{
+            (mock and scenario == 'movement_detected')
+            or (not mock and valid and is_state(entity, 'on'))
+          }}
+
+      - name: CalmHome Still Presence Signal
+        unique_id: calmhome_still_presence_signal
+        device_class: occupancy
+        state: >-
+          {% set mock = is_state('input_boolean.calmhome_mock_mode', 'on') %}
+          {% set scenario = states('input_select.calmhome_mock_scenario') %}
+          {% set entity = states('input_text.calmhome_entity_still_presence_detected') %}
+          {% set valid = entity not in ['unknown', 'unavailable', 'none', ''] %}
+          {{
+            (mock and scenario in ['still_presence', 'long_inactivity'])
+            or (not mock and valid and is_state(entity, 'on'))
+          }}
+
+      - name: CalmHome Fall Signal
+        unique_id: calmhome_fall_signal
+        device_class: safety
+        state: >-
+          {% set mock = is_state('input_boolean.calmhome_mock_mode', 'on') %}
+          {% set scenario = states('input_select.calmhome_mock_scenario') %}
+          {% set entity = states('input_text.calmhome_entity_fall_detected') %}
+          {% set valid = entity not in ['unknown', 'unavailable', 'none', ''] %}
+          {{
+            (mock and scenario == 'fall_suspected')
+            or (not mock and valid and is_state(entity, 'on'))
+          }}
+
+      - name: CalmHome Door Opened Signal
+        unique_id: calmhome_door_opened_signal
+        device_class: door
+        state: >-
+          {% set mock = is_state('input_boolean.calmhome_mock_mode', 'on') %}
+          {% set scenario = states('input_select.calmhome_mock_scenario') %}
+          {% set entity = states('input_text.calmhome_entity_door_opened') %}
+          {% set valid = entity not in ['unknown', 'unavailable', 'none', ''] %}
+          {{
+            (mock and scenario == 'door_opened')
+            or (not mock and valid and is_state(entity, 'on'))
+          }}
+
+      - name: CalmHome Sensor Online Signal
+        unique_id: calmhome_sensor_online_signal
+        device_class: connectivity
+        state: >-
+          {% set mock = is_state('input_boolean.calmhome_mock_mode', 'on') %}
+          {% set entity = states('input_text.calmhome_entity_sensor_online') %}
+          {% set valid = entity not in ['unknown', 'unavailable', 'none', ''] %}
+          {{ mock or (valid and is_state(entity, 'on')) }}
+
+      - name: CalmHome Sensor Offline
+        unique_id: calmhome_sensor_offline
+        device_class: problem
+        state: "{{ not is_state('binary_sensor.calmhome_sensor_online_signal', 'on') }}"
+
       - name: CalmHome Movement Confirmed
         unique_id: calmhome_movement_confirmed
         device_class: motion
-        state: "{{ is_state('binary_sensor.calmhome_movement_detected', 'on') }}"
+        state: "{{ is_state('binary_sensor.calmhome_movement_signal', 'on') }}"
         delay_on:
           seconds: 2
         delay_off:
@@ -41,15 +159,15 @@ template:
         device_class: occupancy
         state: >-
           {{
-            is_state('binary_sensor.calmhome_presence_detected', 'on')
-            or is_state('binary_sensor.calmhome_still_presence_detected', 'on')
+            is_state('binary_sensor.calmhome_presence_signal', 'on')
+            or is_state('binary_sensor.calmhome_still_presence_signal', 'on')
             or is_state('binary_sensor.calmhome_movement_confirmed', 'on')
           }}
 
       - name: CalmHome Fall Suspected
         unique_id: calmhome_fall_suspected
         device_class: safety
-        state: "{{ is_state('binary_sensor.calmhome_fall_detected', 'on') }}"
+        state: "{{ is_state('binary_sensor.calmhome_fall_signal', 'on') }}"
         delay_on:
           seconds: 30
         delay_off:
@@ -58,27 +176,35 @@ template:
       - name: CalmHome Long Inactivity
         unique_id: calmhome_long_inactivity
         state: >-
+          {% set mock = is_state('input_boolean.calmhome_mock_mode', 'on') %}
+          {% set scenario = states('input_select.calmhome_mock_scenario') %}
           {% set last = states('sensor.calmhome_last_activity_time') %}
           {% set threshold = states('input_number.calmhome_long_inactivity_minutes') | int(120) %}
-          {{
-            is_state('binary_sensor.calmhome_presence_confirmed', 'on')
-            and last not in ['unknown', 'unavailable', 'none', '']
-            and (as_timestamp(now()) - as_timestamp(last)) > threshold * 60
-          }}
+          {% if mock and scenario == 'long_inactivity' %}
+            true
+          {% else %}
+            {{
+              is_state('binary_sensor.calmhome_presence_confirmed', 'on')
+              and last not in ['unknown', 'unavailable', 'none', '']
+              and (as_timestamp(now()) - as_timestamp(last)) > threshold * 60
+            }}
+          {% endif %}
         icon: mdi:timer-alert-outline
 
+  # -------------------------------------------------------------------------
+  # Template sensors
+  # -------------------------------------------------------------------------
   - sensor:
       - name: CalmHome Room State
         unique_id: calmhome_room_state
         icon: mdi:home-heart
         state: >-
           {% set occupied = is_state('binary_sensor.calmhome_presence_confirmed', 'on') %}
-          {% set door_open = is_state('binary_sensor.calmhome_door_opened', 'on') %}
           {% if is_state('binary_sensor.calmhome_fall_suspected', 'on') %}
             fall suspected
           {% elif is_state('binary_sensor.calmhome_long_inactivity', 'on') %}
             long inactivity
-          {% elif door_open and occupied %}
+          {% elif is_state('binary_sensor.calmhome_door_opened_signal', 'on') and occupied %}
             door opened
           {% elif is_state('binary_sensor.calmhome_movement_confirmed', 'on') %}
             movement detected
@@ -88,25 +214,69 @@ template:
             stable
           {% endif %}
 
+      - name: CalmHome Last Activity Time
+        unique_id: calmhome_last_activity_time
+        device_class: timestamp
+        availability: >-
+          {% set mock = is_state('input_boolean.calmhome_mock_mode', 'on') %}
+          {% set scenario = states('input_select.calmhome_mock_scenario') %}
+          {% set real_last = states('input_datetime.calmhome_last_activity_time_storage') %}
+          {{ (mock and scenario == 'long_inactivity') or real_last not in ['unknown', 'unavailable', 'none', ''] }}
+        state: >-
+          {% set mock = is_state('input_boolean.calmhome_mock_mode', 'on') %}
+          {% set scenario = states('input_select.calmhome_mock_scenario') %}
+          {% set mock_last = states('input_datetime.calmhome_mock_last_activity_time') %}
+          {% set real_last = states('input_datetime.calmhome_last_activity_time_storage') %}
+          {% set threshold = states('input_number.calmhome_long_inactivity_minutes') | int(120) %}
+          {% if mock and scenario == 'long_inactivity' and mock_last not in ['unknown', 'unavailable', 'none', ''] %}
+            {{ as_datetime(mock_last).isoformat() }}
+          {% elif mock and scenario == 'long_inactivity' %}
+            {{ (as_timestamp(now()) - ((threshold + 5) * 60)) | timestamp_custom('%Y-%m-%dT%H:%M:%S%z', true) }}
+          {% else %}
+            {{ as_datetime(real_last).isoformat() }}
+          {% endif %}
+
       - name: CalmHome Privacy Status
         unique_id: calmhome_privacy_status
         icon: mdi:shield-check
         state: "summary-only local status"
 
-  - trigger:
+      - name: CalmHome Mapped Target Distance
+        unique_id: calmhome_target_distance_mapped
+        unit_of_measurement: m
+        device_class: distance
+        entity_category: diagnostic
+        availability: >-
+          {% set mock = is_state('input_boolean.calmhome_mock_mode', 'on') %}
+          {% set entity = states('input_text.calmhome_entity_target_distance') %}
+          {% set valid = entity not in ['unknown', 'unavailable', 'none', ''] %}
+          {{ not mock and valid and states(entity) not in ['unknown', 'unavailable', 'none', ''] }}
+        state: >-
+          {% set entity = states('input_text.calmhome_entity_target_distance') %}
+          {{ states(entity) }}
+
+# ---------------------------------------------------------------------------
+# Automations
+# ---------------------------------------------------------------------------
+automation:
+  - id: calmhome_record_activity_time
+    alias: CalmHome Record Activity Time
+    mode: queued
+    trigger:
       - platform: state
         entity_id:
-          - binary_sensor.calmhome_movement_confirmed
-          - binary_sensor.calmhome_presence_detected
-          - binary_sensor.calmhome_still_presence_detected
+          - binary_sensor.calmhome_presence_signal
+          - binary_sensor.calmhome_movement_signal
+          - binary_sensor.calmhome_still_presence_signal
         to: "on"
-    sensor:
-      - name: CalmHome Last Activity Time
-        unique_id: calmhome_last_activity_time
-        device_class: timestamp
-        state: "{{ now().isoformat() }}"
+    action:
+      - action: input_datetime.set_datetime
+        target:
+          entity_id: input_datetime.calmhome_last_activity_time_storage
+        data:
+          datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
 
-automation:
+  # Notification examples. Replace notify.notify with your mobile app or notifier.
   - id: calmhome_fall_suspected_notification
     alias: CalmHome Fall Suspected Notification
     mode: single
@@ -114,10 +284,6 @@ automation:
       - platform: state
         entity_id: binary_sensor.calmhome_fall_suspected
         to: "on"
-    condition:
-      - condition: state
-        entity_id: binary_sensor.calmhome_fall_suspected
-        state: "on"
     action:
       - action: notify.notify
         data:
@@ -144,7 +310,7 @@ automation:
     mode: single
     trigger:
       - platform: state
-        entity_id: binary_sensor.calmhome_door_opened
+        entity_id: binary_sensor.calmhome_door_opened_signal
         to: "on"
     condition:
       - condition: state
@@ -156,6 +322,21 @@ automation:
           name: CalmHome
           message: Door opened while the room was occupied.
           entity_id: sensor.calmhome_room_state
+
+  - id: calmhome_sensor_offline_notification
+    alias: CalmHome Sensor Offline Notification
+    mode: single
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.calmhome_sensor_offline
+        to: "on"
+        for:
+          minutes: 3
+    action:
+      - action: notify.notify
+        data:
+          title: CalmHome
+          message: "The mapped CalmHome sensor appears offline."
 
   - id: calmhome_daily_summary_notification
     alias: CalmHome Daily Summary Notification

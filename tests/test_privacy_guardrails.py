@@ -19,7 +19,9 @@ def test_forbidden_feature_term_in_yaml_is_rejected(tmp_path: Path) -> None:
 
     issues = scan_for_forbidden_terms([bad_file])
 
-    assert issues == [{"file": str(bad_file), "term": "camera"}]
+    assert issues[0]["file"] == str(bad_file)
+    assert issues[0]["term"] == "camera"
+    assert "Forbidden" in issues[0]["message"]
 
 
 def test_privacy_docs_state_explicit_absences() -> None:

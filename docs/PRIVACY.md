@@ -10,10 +10,15 @@ calmhome-sensor is designed as a consented home safety/status monitor.
 - No biometric ID.
 - No face recognition.
 - No silhouettes.
+- No silhouette rendering.
 - No raw point cloud export.
+- No raw radar point-cloud export.
 - No identity recognition.
 - No credential capture.
 - No network packet interception.
+- No Wi-Fi packet sniffing.
+- No router hacking.
+- No through-wall sensing.
 
 ## Data Minimization
 

@@ -1,105 +1,162 @@
 # calmhome-sensor
 
-## Goal / 목표
+Privacy-first Home Assistant + ESPHome beta for single-room presence and safety status monitoring.
 
-**English:** calmhome-sensor is a privacy-preserving, camera-free Home Assistant MVP for single-room presence and safety status. It uses ESPHome-compatible sensors and local Home Assistant logic to show only state-level summaries such as stable, presence detected, movement detected, fall suspected, long inactivity, and door opened.
+calmhome-sensor helps a household understand room status without cameras, microphones, identity recognition, body visualization, network interception, or router-based sensing. It is designed for consent-based in-home use with ESPHome-compatible mmWave presence sensors, an optional fall-status sensor, optional door/PIR sensors, Home Assistant automations, mock mode, validation scripts, and deployment documentation.
 
-**한국어:** calmhome-sensor는 한 방의 재실 및 안전 상태를 확인하기 위한 프라이버시 중심의 카메라 없는 Home Assistant MVP입니다. ESPHome 호환 센서와 로컬 Home Assistant 로직을 사용해 안정 상태, 재실 감지, 움직임 감지, 낙상 의심, 장시간 비활동, 문 열림 같은 상태 요약만 표시합니다.
+## Current Status
 
-This is a home safety and status monitor, not a surveillance system. It does not identify people, render bodies, record media, intercept network traffic, or use the Wi-Fi router as a sensing device. The router is only network transport for Home Assistant and ESPHome.
+- MVP skeleton complete.
+- Hardware-ready beta configuration is included.
+- Mock mode is included for safe testing without physical sensors.
+- Real hardware validation is still required in the target room before relying on notifications.
+- Default UI shows state-level summaries only.
 
-## Privacy Model
+## What It Shows
 
-- Local-first: ESPHome devices publish simple entity states to Home Assistant on the local network.
-- Minimal states: the dashboard defaults to summaries, not diagnostic measurements.
-- No identity layer: the MVP does not infer who a person is.
-- Short retention: keep only Home Assistant state history needed for safety/status review; suggested default is 7 days or less.
-- Consent required: all residents should know which sensors are installed, what states they expose, and how notifications work.
-- Remote access: use Tailscale, another VPN, or Home Assistant Cloud. Do not expose Home Assistant with public port forwarding.
+The default dashboard and automations work with simple room states:
 
-## Hardware Assumptions
+- `stable`
+- `presence detected`
+- `movement detected`
+- `fall suspected`
+- `long inactivity`
+- `door opened`
 
-Host:
+Raw diagnostics are hidden by default and should only be enabled for setup or troubleshooting.
 
-- Raspberry Pi, mini PC, or Home Assistant Green running Home Assistant.
+## Privacy And Safety Boundaries
 
-Presence options:
+This project is a home safety and status monitor, not a surveillance system.
 
-- Easiest: Apollo MSR-2 or Everything Presence Lite, adopted into ESPHome/Home Assistant.
-- DIY: ESP32 plus HLK-LD2410C or LD2450 with ESPHome.
+It does not implement:
 
-Fall option:
+- camera capture
+- microphone capture
+- face recognition
+- identity recognition
+- silhouette rendering
+- through-wall sensing
+- router hacking
+- Wi-Fi packet sniffing
+- raw radar point-cloud export
+- credential capture
 
-- Seeed Studio MR60FDA2 with XIAO ESP32C6, exposed through ESPHome.
+The Wi-Fi router is only network transport for Home Assistant and ESPHome. It is not treated as a sensing device.
 
-Optional:
+All monitoring should be local-first, consent-based, and clearly disclosed to every resident. For remote access, use Tailscale, another VPN, or Home Assistant Cloud. Do not expose Home Assistant with public port forwarding.
 
-- PIR motion sensor.
-- Door contact sensor.
+## Quickstart
 
-The project also works without physical hardware by using `scripts/simulate_events.py`.
-
-## Repository Layout
-
-- `esphome/`: example ESPHome device YAML.
-- `homeassistant/packages/calmhome.yaml`: package with template entities and automations.
-- `dashboards/calmhome_dashboard.yaml`: dashboard view that shows only status summaries by default.
-- `scripts/simulate_events.py`: local simulated event generator.
-- `scripts/validate_configs.py`: YAML and privacy guardrail validator.
-- `tests/`: simulated event, YAML loading, and privacy guardrail tests.
-
-## Setup
-
-1. Install Python 3.11 or newer.
-2. Install Python dependencies:
+1. Install Python dependencies:
 
    ```powershell
    python -m pip install -r requirements.txt
    ```
 
-3. Review and copy the ESPHome example you need from `esphome/`.
-4. Add ESPHome secrets in your ESPHome `secrets.yaml`:
+2. Simulate events before installing hardware:
 
-   ```yaml
-   wifi_ssid: "your-wifi"
-   wifi_password: "your-password"
-   calmhome_ld2410_api_key: "replace-with-esphome-api-key"
-   calmhome_ld2410_ota_password: "replace-with-ota-password"
-   calmhome_mr60fda2_api_key: "replace-with-esphome-api-key"
-   calmhome_mr60fda2_ota_password: "replace-with-ota-password"
-   calmhome_fallback_ap_password: "replace-with-setup-password"
+   ```powershell
+   python scripts/simulate_events.py normal_activity
+   python scripts/simulate_events.py fall_suspected
    ```
 
-5. In Home Assistant, enable packages if not already enabled:
+3. Install the Home Assistant packages:
 
-   ```yaml
-   homeassistant:
-     packages: !include_dir_named packages
-   ```
+   - `homeassistant/packages/calmhome.yaml`
+   - `homeassistant/packages/calmhome_mock.yaml`
 
-6. Place `homeassistant/packages/calmhome.yaml` into your Home Assistant `packages/` directory.
-7. If your ESPHome entity IDs differ, replace the entity IDs in the package comments section and templates.
-8. Import or paste `dashboards/calmhome_dashboard.yaml` into a Home Assistant dashboard.
+4. Enable mock mode in Home Assistant and test each scenario:
 
-## Validation And Simulation
+   - `room_empty`
+   - `presence_detected`
+   - `movement_detected`
+   - `still_presence`
+   - `fall_suspected`
+   - `long_inactivity`
+   - `door_opened`
+
+5. Install an ESPHome sensor using one of the examples in `esphome/`.
+6. Map your real Home Assistant entity IDs using the CalmHome mapping helpers.
+7. Import or recreate the dashboard from `dashboards/calmhome_dashboard.yaml`.
+8. Test notifications with mock mode, then test again with physical sensors.
+
+## Hardware Assumptions
+
+Home Assistant host:
+
+- Raspberry Pi
+- mini PC
+- Home Assistant Green
+
+Presence sensor options:
+
+- Apollo MSR-2 or Everything Presence Lite
+- ESP32 + HLK-LD2410C
+- ESP32 + LD2450
+
+Fall-status option:
+
+- Seeed Studio MR60FDA2 with XIAO ESP32C6
+
+Optional sensors:
+
+- PIR motion sensor
+- door contact sensor
+
+## Entity Mapping
+
+Use `config/entities.example.yaml` as the logical entity checklist:
+
+- `presence_detected`
+- `movement_detected`
+- `still_presence_detected`
+- `target_distance`
+- `fall_detected`
+- `door_opened`
+- `sensor_online`
+
+For private local notes, copy:
 
 ```powershell
-make validate
-make test
-make simulate-normal
-make simulate-fall
+Copy-Item config/entities.local.example.yaml config/entities.local.yaml
 ```
 
-If `make` is not available on your system, run the underlying commands:
+Then replace the placeholders with entity IDs from Home Assistant Developer Tools > States.
+
+`config/entities.local.yaml` is ignored by Git. Do not commit personal entity IDs, Wi-Fi names, passwords, API keys, or room-specific private notes.
+
+## Documentation
+
+- [Home Assistant installation](docs/INSTALL_HOME_ASSISTANT.md)
+- [ESPHome installation](docs/INSTALL_ESPHOME.md)
+- [Hardware guide](docs/HARDWARE.md)
+- [Sensor placement guide](docs/SENSOR_PLACEMENT.md)
+- [Runtime test plan](docs/RUNTIME_TEST_PLAN.md)
+- [Privacy model](docs/PRIVACY.md)
+
+## Repository Layout
+
+```text
+config/                 Entity mapping examples
+dashboards/             Home Assistant dashboard YAML
+docs/                   Installation, privacy, hardware, placement, and test docs
+esphome/                ESPHome example device YAML
+homeassistant/packages/ Home Assistant core and mock packages
+scripts/                Simulation and validation utilities
+tests/                  Pytest test suite
+```
+
+## Validation
+
+Run the full local validation suite:
 
 ```powershell
 python scripts/validate_configs.py
 python -m pytest tests
-python scripts/simulate_events.py normal_activity
-python scripts/simulate_events.py fall_suspected
 ```
 
-If you prefer package scripts:
+Or use npm scripts:
 
 ```powershell
 npm run validate
@@ -108,8 +165,19 @@ npm run simulate-normal
 npm run simulate-fall
 ```
 
-## Notes
+If `make` is available:
 
-- Physical sensor tuning is room-specific. Start with conservative sensitivity and test with consented residents.
-- Do not use this project for hidden monitoring or outside a home safety/status context.
-- The optional diagnostics section is disabled by default and should only be enabled for setup and troubleshooting.
+```powershell
+make validate
+make test
+make simulate-normal
+make simulate-fall
+```
+
+## Notes For Deployment
+
+- Start in mock mode before connecting physical sensors.
+- Use conservative sensor sensitivity until the room has been tested.
+- Keep optional diagnostics disabled during normal use.
+- Confirm long-inactivity and fall-suspected notification behavior with residents.
+- Re-run the runtime test plan after moving furniture, changing curtains, adding fans, or changing sensor angle.

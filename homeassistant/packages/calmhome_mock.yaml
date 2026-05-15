@@ -1,0 +1,46 @@
+# calmhome-sensor mock mode package.
+# Install with calmhome.yaml to test the dashboard and automations without hardware.
+
+input_boolean:
+  calmhome_mock_mode:
+    name: CalmHome Mock Mode
+    icon: mdi:test-tube
+
+input_select:
+  calmhome_mock_scenario:
+    name: CalmHome Mock Scenario
+    options:
+      - room_empty
+      - presence_detected
+      - movement_detected
+      - still_presence
+      - fall_suspected
+      - long_inactivity
+      - door_opened
+    initial: room_empty
+    icon: mdi:playlist-check
+
+input_datetime:
+  calmhome_mock_last_activity_time:
+    name: CalmHome Mock Last Activity Time
+    has_date: true
+    has_time: true
+
+automation:
+  - id: calmhome_mock_set_long_inactivity_time
+    alias: CalmHome Mock Set Long Inactivity Time
+    mode: single
+    trigger:
+      - platform: state
+        entity_id: input_select.calmhome_mock_scenario
+        to: long_inactivity
+    condition:
+      - condition: state
+        entity_id: input_boolean.calmhome_mock_mode
+        state: "on"
+    action:
+      - action: input_datetime.set_datetime
+        target:
+          entity_id: input_datetime.calmhome_mock_last_activity_time
+        data:
+          datetime: "{{ (as_timestamp(now()) - 7500) | timestamp_custom('%Y-%m-%d %H:%M:%S', true) }}"

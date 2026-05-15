@@ -24,13 +24,26 @@ views:
             name: Privacy status
 
       - type: entities
-        title: Controls
+        title: Mock Mode
+        show_header_toggle: false
+        entities:
+          - entity: input_boolean.calmhome_mock_mode
+            name: Enable mock mode
+          - entity: input_select.calmhome_mock_scenario
+            name: Mock scenario
+          - entity: input_datetime.calmhome_mock_last_activity_time
+            name: Mock last activity
+
+      - type: entities
+        title: Setup Controls
         show_header_toggle: false
         entities:
           - entity: input_number.calmhome_long_inactivity_minutes
             name: Inactivity threshold
           - entity: input_boolean.calmhome_show_diagnostics
             name: Show diagnostics
+          - entity: binary_sensor.calmhome_sensor_offline
+            name: Sensor offline
 
       - type: conditional
         conditions:
@@ -41,17 +54,29 @@ views:
           title: Optional Diagnostics
           show_header_toggle: false
           entities:
-            - entity: binary_sensor.calmhome_sensor_online
-              name: Presence sensor online
-            - entity: binary_sensor.calmhome_fall_sensor_online
-              name: Fall sensor online
-            - entity: sensor.calmhome_target_distance
+            - entity: binary_sensor.calmhome_sensor_online_signal
+              name: Sensor online signal
+            - entity: binary_sensor.calmhome_presence_signal
+              name: Presence signal
+            - entity: binary_sensor.calmhome_movement_signal
+              name: Movement signal
+            - entity: binary_sensor.calmhome_still_presence_signal
+              name: Still-presence signal
+            - entity: binary_sensor.calmhome_fall_signal
+              name: Fall signal
+            - entity: binary_sensor.calmhome_door_opened_signal
+              name: Door signal
+            - entity: sensor.calmhome_mapped_target_distance
               name: Target distance
-            - entity: binary_sensor.calmhome_presence_detected
-              name: Sensor presence signal
-            - entity: binary_sensor.calmhome_movement_detected
-              name: Sensor movement signal
-            - entity: binary_sensor.calmhome_still_presence_detected
-              name: Sensor still-presence signal
-            - entity: binary_sensor.calmhome_fall_detected
-              name: Sensor fall signal
+            - entity: input_text.calmhome_entity_presence_detected
+              name: Mapped presence entity
+            - entity: input_text.calmhome_entity_movement_detected
+              name: Mapped movement entity
+            - entity: input_text.calmhome_entity_still_presence_detected
+              name: Mapped still-presence entity
+            - entity: input_text.calmhome_entity_fall_detected
+              name: Mapped fall entity
+            - entity: input_text.calmhome_entity_door_opened
+              name: Mapped door entity
+            - entity: input_text.calmhome_entity_sensor_online
+              name: Mapped online entity
