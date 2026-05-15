@@ -1,0 +1,57 @@
+title: CalmHome Sensor
+views:
+  - title: CalmHome
+    path: calmhome
+    icon: mdi:home-heart
+    cards:
+      - type: entities
+        title: Room Status
+        show_header_toggle: false
+        entities:
+          - entity: sensor.calmhome_room_state
+            name: Room state
+          - entity: binary_sensor.calmhome_presence_confirmed
+            name: Presence
+          - entity: binary_sensor.calmhome_movement_confirmed
+            name: Movement
+          - entity: binary_sensor.calmhome_fall_suspected
+            name: Fall suspected
+          - entity: binary_sensor.calmhome_long_inactivity
+            name: Long inactivity
+          - entity: sensor.calmhome_last_activity_time
+            name: Last activity
+          - entity: sensor.calmhome_privacy_status
+            name: Privacy status
+
+      - type: entities
+        title: Controls
+        show_header_toggle: false
+        entities:
+          - entity: input_number.calmhome_long_inactivity_minutes
+            name: Inactivity threshold
+          - entity: input_boolean.calmhome_show_diagnostics
+            name: Show diagnostics
+
+      - type: conditional
+        conditions:
+          - entity: input_boolean.calmhome_show_diagnostics
+            state: "on"
+        card:
+          type: entities
+          title: Optional Diagnostics
+          show_header_toggle: false
+          entities:
+            - entity: binary_sensor.calmhome_sensor_online
+              name: Presence sensor online
+            - entity: binary_sensor.calmhome_fall_sensor_online
+              name: Fall sensor online
+            - entity: sensor.calmhome_target_distance
+              name: Target distance
+            - entity: binary_sensor.calmhome_presence_detected
+              name: Sensor presence signal
+            - entity: binary_sensor.calmhome_movement_detected
+              name: Sensor movement signal
+            - entity: binary_sensor.calmhome_still_presence_detected
+              name: Sensor still-presence signal
+            - entity: binary_sensor.calmhome_fall_detected
+              name: Sensor fall signal

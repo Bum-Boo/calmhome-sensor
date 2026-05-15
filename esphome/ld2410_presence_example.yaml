@@ -1,0 +1,105 @@
+substitutions:
+  device_name: calmhome-ld2410-presence
+  friendly_name: CalmHome Presence
+
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+  comment: Single-room consented presence status sensor.
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+logger:
+
+api:
+  encryption:
+    key: !secret calmhome_ld2410_api_key
+
+ota:
+  - platform: esphome
+    password: !secret calmhome_ld2410_ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "${friendly_name} Setup"
+    password: !secret calmhome_fallback_ap_password
+
+captive_portal:
+
+# Replace pins for your ESP32 board and wiring.
+uart:
+  id: ld2410_uart
+  tx_pin: GPIO17
+  rx_pin: GPIO16
+  baud_rate: 256000
+  parity: NONE
+  stop_bits: 1
+
+ld2410:
+  id: ld2410_radar
+  uart_id: ld2410_uart
+
+binary_sensor:
+  - platform: status
+    id: sensor_online
+    name: "CalmHome Sensor Online"
+    entity_category: diagnostic
+
+  - platform: ld2410
+    ld2410_id: ld2410_radar
+    has_target:
+      id: presence_detected
+      name: "CalmHome Presence Detected"
+      device_class: occupancy
+    has_moving_target:
+      id: movement_detected
+      name: "CalmHome Movement Detected"
+      device_class: motion
+    has_still_target:
+      id: still_presence_detected
+      name: "CalmHome Still Presence Detected"
+      device_class: occupancy
+
+sensor:
+  - platform: ld2410
+    ld2410_id: ld2410_radar
+    detection_distance:
+      id: target_distance
+      name: "CalmHome Target Distance"
+      entity_category: diagnostic
+      disabled_by_default: true
+    moving_distance:
+      name: "CalmHome Moving Target Distance"
+      entity_category: diagnostic
+      disabled_by_default: true
+    still_distance:
+      name: "CalmHome Still Target Distance"
+      entity_category: diagnostic
+      disabled_by_default: true
+
+switch:
+  - platform: ld2410
+    ld2410_id: ld2410_radar
+    engineering_mode:
+      name: "CalmHome Engineering Mode"
+      entity_category: diagnostic
+      disabled_by_default: true
+    bluetooth:
+      name: "CalmHome Bluetooth"
+      entity_category: config
+      disabled_by_default: true
+
+button:
+  - platform: ld2410
+    ld2410_id: ld2410_radar
+    restart:
+      name: "CalmHome Restart Presence Sensor"
+      entity_category: diagnostic
+    query_params:
+      name: "CalmHome Refresh Presence Parameters"
+      entity_category: diagnostic

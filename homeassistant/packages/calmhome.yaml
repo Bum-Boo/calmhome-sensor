@@ -1,0 +1,172 @@
+# calmhome-sensor Home Assistant package.
+#
+# Replace these entity IDs if your ESPHome devices produce different names:
+# - binary_sensor.calmhome_presence_detected
+# - binary_sensor.calmhome_movement_detected
+# - binary_sensor.calmhome_still_presence_detected
+# - sensor.calmhome_target_distance
+# - binary_sensor.calmhome_fall_detected
+# - binary_sensor.calmhome_sensor_online
+# - binary_sensor.calmhome_door_opened
+
+input_boolean:
+  calmhome_show_diagnostics:
+    name: CalmHome Show Diagnostics
+    icon: mdi:tune-variant
+
+input_number:
+  calmhome_long_inactivity_minutes:
+    name: CalmHome Long Inactivity Minutes
+    min: 15
+    max: 720
+    step: 15
+    mode: box
+    unit_of_measurement: min
+    icon: mdi:timer-sand
+    initial: 120
+
+template:
+  - binary_sensor:
+      - name: CalmHome Movement Confirmed
+        unique_id: calmhome_movement_confirmed
+        device_class: motion
+        state: "{{ is_state('binary_sensor.calmhome_movement_detected', 'on') }}"
+        delay_on:
+          seconds: 2
+        delay_off:
+          seconds: 2
+
+      - name: CalmHome Presence Confirmed
+        unique_id: calmhome_presence_confirmed
+        device_class: occupancy
+        state: >-
+          {{
+            is_state('binary_sensor.calmhome_presence_detected', 'on')
+            or is_state('binary_sensor.calmhome_still_presence_detected', 'on')
+            or is_state('binary_sensor.calmhome_movement_confirmed', 'on')
+          }}
+
+      - name: CalmHome Fall Suspected
+        unique_id: calmhome_fall_suspected
+        device_class: safety
+        state: "{{ is_state('binary_sensor.calmhome_fall_detected', 'on') }}"
+        delay_on:
+          seconds: 30
+        delay_off:
+          seconds: 30
+
+      - name: CalmHome Long Inactivity
+        unique_id: calmhome_long_inactivity
+        state: >-
+          {% set last = states('sensor.calmhome_last_activity_time') %}
+          {% set threshold = states('input_number.calmhome_long_inactivity_minutes') | int(120) %}
+          {{
+            is_state('binary_sensor.calmhome_presence_confirmed', 'on')
+            and last not in ['unknown', 'unavailable', 'none', '']
+            and (as_timestamp(now()) - as_timestamp(last)) > threshold * 60
+          }}
+        icon: mdi:timer-alert-outline
+
+  - sensor:
+      - name: CalmHome Room State
+        unique_id: calmhome_room_state
+        icon: mdi:home-heart
+        state: >-
+          {% set occupied = is_state('binary_sensor.calmhome_presence_confirmed', 'on') %}
+          {% set door_open = is_state('binary_sensor.calmhome_door_opened', 'on') %}
+          {% if is_state('binary_sensor.calmhome_fall_suspected', 'on') %}
+            fall suspected
+          {% elif is_state('binary_sensor.calmhome_long_inactivity', 'on') %}
+            long inactivity
+          {% elif door_open and occupied %}
+            door opened
+          {% elif is_state('binary_sensor.calmhome_movement_confirmed', 'on') %}
+            movement detected
+          {% elif occupied %}
+            presence detected
+          {% else %}
+            stable
+          {% endif %}
+
+      - name: CalmHome Privacy Status
+        unique_id: calmhome_privacy_status
+        icon: mdi:shield-check
+        state: "summary-only local status"
+
+  - trigger:
+      - platform: state
+        entity_id:
+          - binary_sensor.calmhome_movement_confirmed
+          - binary_sensor.calmhome_presence_detected
+          - binary_sensor.calmhome_still_presence_detected
+        to: "on"
+    sensor:
+      - name: CalmHome Last Activity Time
+        unique_id: calmhome_last_activity_time
+        device_class: timestamp
+        state: "{{ now().isoformat() }}"
+
+automation:
+  - id: calmhome_fall_suspected_notification
+    alias: CalmHome Fall Suspected Notification
+    mode: single
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.calmhome_fall_suspected
+        to: "on"
+    condition:
+      - condition: state
+        entity_id: binary_sensor.calmhome_fall_suspected
+        state: "on"
+    action:
+      - action: notify.notify
+        data:
+          title: CalmHome
+          message: "Fall suspected in the monitored room. Check in using your agreed household process."
+
+  - id: calmhome_long_inactivity_notification
+    alias: CalmHome Long Inactivity Notification
+    mode: single
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.calmhome_long_inactivity
+        to: "on"
+        for:
+          minutes: 5
+    action:
+      - action: notify.notify
+        data:
+          title: CalmHome
+          message: "Long inactivity while the room still appears occupied."
+
+  - id: calmhome_door_opened_while_occupied
+    alias: CalmHome Door Opened While Occupied Event
+    mode: single
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.calmhome_door_opened
+        to: "on"
+    condition:
+      - condition: state
+        entity_id: binary_sensor.calmhome_presence_confirmed
+        state: "on"
+    action:
+      - action: logbook.log
+        data:
+          name: CalmHome
+          message: Door opened while the room was occupied.
+          entity_id: sensor.calmhome_room_state
+
+  - id: calmhome_daily_summary_notification
+    alias: CalmHome Daily Summary Notification
+    mode: single
+    trigger:
+      - platform: time
+        at: "21:00:00"
+    action:
+      - action: notify.notify
+        data:
+          title: CalmHome Daily Summary
+          message: >-
+            Room state: {{ states('sensor.calmhome_room_state') }}.
+            Last activity: {{ states('sensor.calmhome_last_activity_time') }}.

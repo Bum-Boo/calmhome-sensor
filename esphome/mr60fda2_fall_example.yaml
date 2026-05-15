@@ -1,0 +1,79 @@
+substitutions:
+  device_name: calmhome-mr60fda2-fall
+  friendly_name: CalmHome Fall
+
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+  comment: Single-room consented fall status sensor.
+
+esp32:
+  board: seeed_xiao_esp32c6
+  framework:
+    type: esp-idf
+
+logger:
+
+api:
+  encryption:
+    key: !secret calmhome_mr60fda2_api_key
+
+ota:
+  - platform: esphome
+    password: !secret calmhome_mr60fda2_ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "${friendly_name} Setup"
+    password: !secret calmhome_fallback_ap_password
+
+captive_portal:
+
+# Replace pins if your XIAO ESP32C6 carrier uses a different UART mapping.
+uart:
+  id: mr60fda2_uart
+  tx_pin: GPIO17
+  rx_pin: GPIO16
+  baud_rate: 115200
+  parity: NONE
+  stop_bits: 1
+
+seeed_mr60fda2:
+  id: mr60fda2_sensor
+  uart_id: mr60fda2_uart
+
+binary_sensor:
+  - platform: status
+    id: sensor_online
+    name: "CalmHome Fall Sensor Online"
+    entity_category: diagnostic
+
+  - platform: seeed_mr60fda2
+    people_exist:
+      id: presence_detected
+      name: "CalmHome Fall Sensor Presence Detected"
+      device_class: occupancy
+    fall_detected:
+      id: fall_detected
+      name: "CalmHome Fall Detected"
+      device_class: safety
+
+button:
+  - platform: seeed_mr60fda2
+    get_radar_parameters:
+      name: "CalmHome Refresh Fall Parameters"
+      entity_category: diagnostic
+
+select:
+  - platform: seeed_mr60fda2
+    install_height:
+      name: "CalmHome Fall Install Height"
+      entity_category: config
+    height_threshold:
+      name: "CalmHome Fall Height Threshold"
+      entity_category: config
+    sensitivity:
+      name: "CalmHome Fall Sensitivity"
+      entity_category: config

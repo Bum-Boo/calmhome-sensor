@@ -1,0 +1,11 @@
+{
+  "name": "calmhome-sensor",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "test": "python -m pytest tests",
+    "validate": "python scripts/validate_configs.py",
+    "simulate-normal": "python scripts/simulate_events.py normal_activity",
+    "simulate-fall": "python scripts/simulate_events.py fall_suspected"
+  }
+}
