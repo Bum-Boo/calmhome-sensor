@@ -1,183 +1,76 @@
-# calmhome-sensor
+# CalmHome Sensor
 
-Privacy-first Home Assistant + ESPHome beta for single-room presence and safety status monitoring.
+[English](README.md) | [한국어](docs/README.ko.md) | [日本語](docs/README.ja.md) | [中文](docs/README.zh-CN.md)
 
-calmhome-sensor helps a household understand room status without cameras, microphones, identity recognition, body visualization, network interception, or router-based sensing. It is designed for consent-based in-home use with ESPHome-compatible mmWave presence sensors, an optional fall-status sensor, optional door/PIR sensors, Home Assistant automations, mock mode, validation scripts, and deployment documentation.
+Privacy-first Home Assistant and ESPHome configuration for room-level presence and safety status monitoring. CalmHome reports simple states such as presence, movement, suspected falls, long inactivity, and door opening without cameras, microphones, identity recognition, or router-based sensing.
 
-## Current Status
+> **Safety notice:** This is a beta home-status aid, not a medical device, emergency service, or guaranteed fall detector. Validate every sensor and notification in the target room and keep an independent way to request help.
 
-- MVP skeleton complete.
-- Hardware-ready beta configuration is included.
-- Mock mode is included for safe testing without physical sensors.
-- Real hardware validation is still required in the target room before relying on notifications.
-- Default UI shows state-level summaries only.
+## Privacy and safety boundaries
 
-## What It Shows
+- Use only with the informed consent of everyone who may enter the monitored space.
+- Processing is designed to remain in Home Assistant and ESPHome on your local network.
+- The router provides network transport only; this project does not sniff Wi-Fi traffic or use through-wall/router sensing.
+- Camera, microphone, face/identity recognition, silhouettes, raw radar point clouds, credential capture, and public port forwarding are outside the project scope.
+- Keep diagnostic entities disabled during normal use. Never commit Wi-Fi credentials, API keys, personal entity IDs, or room-specific notes.
+- For remote access, use a VPN such as Tailscale or Home Assistant Cloud rather than exposing Home Assistant directly to the internet.
 
-The default dashboard and automations work with simple room states:
+See [the privacy model](docs/PRIVACY.md) and [runtime test plan](docs/RUNTIME_TEST_PLAN.md) before deployment.
 
-- `stable`
-- `presence detected`
-- `movement detected`
-- `fall suspected`
-- `long inactivity`
-- `door opened`
+## Requirements
 
-Raw diagnostics are hidden by default and should only be enabled for setup or troubleshooting.
+- A Home Assistant host (for example, Home Assistant Green, a Raspberry Pi, or a mini PC)
+- An ESPHome-compatible presence sensor; supported examples are documented in [the hardware guide](docs/HARDWARE.md)
+- Optional fall-status, PIR, or door-contact sensors
+- Python 3 with the packages in `requirements.txt` for local validation
 
-## Privacy And Safety Boundaries
+Real hardware behavior depends on sensor placement, room layout, firmware, and calibration. The repository includes mock mode so you can test without physical sensors first.
 
-This project is a home safety and status monitor, not a surveillance system.
+## Quick start
 
-It does not implement:
+```bash
+python -m pip install -r requirements.txt
+python scripts/validate_configs.py
+python -m pytest tests
+python scripts/simulate_events.py normal_activity
+python scripts/simulate_events.py fall_suspected
+```
 
-- camera capture
-- microphone capture
-- face recognition
-- identity recognition
-- silhouette rendering
-- through-wall sensing
-- router hacking
-- Wi-Fi packet sniffing
-- raw radar point-cloud export
-- credential capture
+Then:
 
-The Wi-Fi router is only network transport for Home Assistant and ESPHome. It is not treated as a sensing device.
+1. Add `homeassistant/packages/calmhome.yaml` and `homeassistant/packages/calmhome_mock.yaml` to Home Assistant.
+2. Enable mock mode and test `room_empty`, `presence_detected`, `movement_detected`, `still_presence`, `fall_suspected`, `long_inactivity`, and `door_opened`.
+3. Choose and adapt an example from `esphome/`.
+4. Copy `config/entities.local.example.yaml` to the ignored `config/entities.local.yaml`, then map real entity IDs from Home Assistant Developer Tools.
+5. Import or recreate `dashboards/calmhome_dashboard.yaml`.
+6. Follow the [Home Assistant](docs/INSTALL_HOME_ASSISTANT.md), [ESPHome](docs/INSTALL_ESPHOME.md), [placement](docs/SENSOR_PLACEMENT.md), and [runtime testing](docs/RUNTIME_TEST_PLAN.md) guides before enabling notifications.
 
-All monitoring should be local-first, consent-based, and clearly disclosed to every resident. For remote access, use Tailscale, another VPN, or Home Assistant Cloud. Do not expose Home Assistant with public port forwarding.
-
-## Quickstart
-
-1. Install Python dependencies:
-
-   ```powershell
-   python -m pip install -r requirements.txt
-   ```
-
-2. Simulate events before installing hardware:
-
-   ```powershell
-   python scripts/simulate_events.py normal_activity
-   python scripts/simulate_events.py fall_suspected
-   ```
-
-3. Install the Home Assistant packages:
-
-   - `homeassistant/packages/calmhome.yaml`
-   - `homeassistant/packages/calmhome_mock.yaml`
-
-4. Enable mock mode in Home Assistant and test each scenario:
-
-   - `room_empty`
-   - `presence_detected`
-   - `movement_detected`
-   - `still_presence`
-   - `fall_suspected`
-   - `long_inactivity`
-   - `door_opened`
-
-5. Install an ESPHome sensor using one of the examples in `esphome/`.
-6. Map your real Home Assistant entity IDs using the CalmHome mapping helpers.
-7. Import or recreate the dashboard from `dashboards/calmhome_dashboard.yaml`.
-8. Test notifications with mock mode, then test again with physical sensors.
-
-## Hardware Assumptions
-
-Home Assistant host:
-
-- Raspberry Pi
-- mini PC
-- Home Assistant Green
-
-Presence sensor options:
-
-- Apollo MSR-2 or Everything Presence Lite
-- ESP32 + HLK-LD2410C
-- ESP32 + LD2450
-
-Fall-status option:
-
-- Seeed Studio MR60FDA2 with XIAO ESP32C6
-
-Optional sensors:
-
-- PIR motion sensor
-- door contact sensor
-
-## Entity Mapping
-
-Use `config/entities.example.yaml` as the logical entity checklist:
-
-- `presence_detected`
-- `movement_detected`
-- `still_presence_detected`
-- `target_distance`
-- `fall_detected`
-- `door_opened`
-- `sensor_online`
-
-For private local notes, copy:
+PowerShell users can copy the local mapping template with:
 
 ```powershell
 Copy-Item config/entities.local.example.yaml config/entities.local.yaml
 ```
 
-Then replace the placeholders with entity IDs from Home Assistant Developer Tools > States.
-
-`config/entities.local.yaml` is ignored by Git. Do not commit personal entity IDs, Wi-Fi names, passwords, API keys, or room-specific private notes.
-
-## Documentation
-
-- [Home Assistant installation](docs/INSTALL_HOME_ASSISTANT.md)
-- [ESPHome installation](docs/INSTALL_ESPHOME.md)
-- [Hardware guide](docs/HARDWARE.md)
-- [Sensor placement guide](docs/SENSOR_PLACEMENT.md)
-- [Runtime test plan](docs/RUNTIME_TEST_PLAN.md)
-- [Privacy model](docs/PRIVACY.md)
-
-## Repository Layout
+## What is included
 
 ```text
-config/                 Entity mapping examples
+config/                 Logical and local entity mapping templates
 dashboards/             Home Assistant dashboard YAML
-docs/                   Installation, privacy, hardware, placement, and test docs
-esphome/                ESPHome example device YAML
-homeassistant/packages/ Home Assistant core and mock packages
-scripts/                Simulation and validation utilities
-tests/                  Pytest test suite
+docs/                   Installation, hardware, privacy, placement, and test guides
+esphome/                ESPHome example configurations
+homeassistant/packages/ Home Assistant production and mock packages
+scripts/                Simulation and configuration validation utilities
+tests/                  Pytest validation suite
 ```
 
-## Validation
+## Limitations
 
-Run the full local validation suite:
+- Physical hardware has not been validated for every room or listed sensor; test in place before relying on alerts.
+- A `fall suspected` or `long inactivity` state can be a false positive or false negative.
+- State summaries do not identify a person or explain why an event occurred.
+- Moving furniture, curtains, fans, or sensors can change detection behavior and requires retesting.
+- This project does not replace direct check-ins, professional care, smoke/CO alarms, or emergency systems.
 
-```powershell
-python scripts/validate_configs.py
-python -m pytest tests
-```
+## Attribution
 
-Or use npm scripts:
-
-```powershell
-npm run validate
-npm test
-npm run simulate-normal
-npm run simulate-fall
-```
-
-If `make` is available:
-
-```powershell
-make validate
-make test
-make simulate-normal
-make simulate-fall
-```
-
-## Notes For Deployment
-
-- Start in mock mode before connecting physical sensors.
-- Use conservative sensor sensitivity until the room has been tested.
-- Keep optional diagnostics disabled during normal use.
-- Confirm long-inactivity and fall-suspected notification behavior with residents.
-- Re-run the runtime test plan after moving furniture, changing curtains, adding fans, or changing sensor angle.
+If you share a fork, demo, article, or derivative, a courteous mention of [@Bum-Boo](https://github.com/Bum-Boo) and the [original repository](https://github.com/Bum-Boo/Wifi-home-protector) is appreciated. This is a request for credit, not an additional license condition or restriction.
