@@ -6,6 +6,18 @@ Privacy-first Home Assistant and ESPHome configuration for room-level presence a
 
 > **Safety notice:** This is a beta home-status aid, not a medical device, emergency service, or guaranteed fall detector. Validate every sensor and notification in the target room and keep an independent way to request help.
 
+```mermaid
+flowchart LR
+  S["Radar sensor<br/>LD2410 or MR60FDA2"] --> E["ESPHome"]
+  D["Door contact (optional)"] --> H
+  E --> H["Home Assistant<br/>CalmHome package"]
+  H --> T["Room states<br/>empty, presence, still,<br/>fall suspected, long inactivity"]
+  T --> V["Dashboard"]
+  T --> N["Phone notification"]
+```
+
+No cameras or microphones. You can try every state in mock mode before buying any hardware.
+
 ## Privacy and safety boundaries
 
 - Use only with the informed consent of everyone who may enter the monitored space.
@@ -73,4 +85,4 @@ tests/                  Pytest validation suite
 
 ## Attribution
 
-If you share a fork, demo, article, or derivative, a courteous mention of [@Bum-Boo](https://github.com/Bum-Boo) and the [original repository](https://github.com/Bum-Boo/Wifi-home-protector) is appreciated. This is a request for credit, not an additional license condition or restriction.
+If you share a fork, demo, article, or derivative, a courteous mention of [@Bum-Boo](https://github.com/Bum-Boo) and the [original repository](https://github.com/Bum-Boo/calmhome-sensor) is appreciated. This is a request for credit, not an additional license condition or restriction.
