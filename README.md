@@ -86,3 +86,7 @@ tests/                  Pytest validation suite
 ## Attribution
 
 If you share a fork, demo, article, or derivative, a courteous mention of [@Bum-Boo](https://github.com/Bum-Boo) and the [original repository](https://github.com/Bum-Boo/calmhome-sensor) is appreciated. This is a request for credit, not an additional license condition or restriction.
+
+## License
+
+[MIT](LICENSE)
