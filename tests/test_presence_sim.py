@@ -151,3 +151,31 @@ def test_mock_long_inactivity_shows_last_activity_time() -> None:
 
     assert sim.states(LAST_ACTIVITY) not in ("unknown", "unavailable")
     assert sim.states(ROOM) == "long inactivity"
+
+
+def test_continuous_movement_is_never_long_inactivity() -> None:
+    sim = replay(STREAMS["continuous_movement"], duration=3 * 3600)
+
+    assert sim.states(ROOM) == "movement detected"
+    assert not sim.seen(LONG, "on")
+    assert alerts(sim, LONG_ALERT) == []
+
+
+def test_inactivity_is_measured_from_when_movement_stopped() -> None:
+    # Walks for an hour, then sits still: the timer starts when movement ends.
+    stream = STREAMS["continuous_movement"] + [(3660, {"movement_detected": "off", "still_presence_detected": "on"})]
+    sim = replay(stream, duration=3660 + 110 * 60)
+    assert sim.states(LONG) == "off"
+
+    sim.advance(15 * 60)
+    assert sim.states(LONG) == "on"
+
+
+def test_movement_ending_counts_as_activity_without_still_sensor() -> None:
+    # Sensors without a still-target entity: only presence and movement are reported.
+    stream = STREAMS["continuous_movement"] + [(3 * 3600, {"movement_detected": "off"})]
+    sim = replay(stream, duration=3 * 3600 + 30 * 60)
+
+    assert sim.states(PRESENCE) == "on"
+    assert sim.states(LONG) == "off"
+    assert sim.states(ROOM) == "presence detected"

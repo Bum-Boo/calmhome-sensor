@@ -185,6 +185,7 @@ template:
           {% else %}
             {{
               is_state('binary_sensor.calmhome_presence_confirmed', 'on')
+              and not is_state('binary_sensor.calmhome_movement_signal', 'on')
               and last not in ['unknown', 'unavailable', 'none', '']
               and (as_timestamp(now()) - as_timestamp(last)) > threshold * 60
             }}
@@ -271,6 +272,11 @@ automation:
           - binary_sensor.calmhome_movement_signal
           - binary_sensor.calmhome_still_presence_signal
         to: "on"
+      # The moment movement stops is the last time activity was seen.
+      - platform: state
+        entity_id: binary_sensor.calmhome_movement_signal
+        from: "on"
+        to: "off"
     action:
       - action: input_datetime.set_datetime
         target:
