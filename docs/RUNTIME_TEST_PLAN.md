@@ -210,16 +210,17 @@ Setup:
 
 - Disable mock mode.
 - Sit still in the room until the room state is `presence detected`.
-- Unplug the ESPHome sensor for about 1 minute, then plug it back in while still seated.
+- Unplug the ESPHome sensor and wait until the room state shows `sensor offline`. Home Assistant can take a minute or two to notice a powered-off device.
+- Plug it back in within about a minute, while still seated.
 
 Expected Home Assistant state:
 
-- `sensor.calmhome_room_state` shows `sensor offline` during the dropout.
-- `input_datetime.calmhome_last_activity_time_storage` does not change when the sensor reconnects.
+- `sensor.calmhome_room_state` shows `sensor offline` during the dropout, never `stable`.
+- After the reconnect, `sensor.calmhome_last_activity_time` shows the time the dropout started (or a later real movement), not the reconnect time.
 
 Expected notification behavior:
 
-- No offline notification for a dropout shorter than 3 minutes.
+- No offline notification if the sensor was reported offline for less than 3 minutes.
 
 Pass/Fail:
 
@@ -234,7 +235,7 @@ Setup:
 Expected Home Assistant state:
 
 - `sensor.calmhome_last_activity_time` shows a time, not `unknown`.
-- `binary_sensor.calmhome_long_inactivity` turns on about 15 minutes after the last movement.
+- `binary_sensor.calmhome_long_inactivity` turns on about 15 minutes after the last movement (or after a Home Assistant restart or sensor dropout, whichever was later).
 - `sensor.calmhome_room_state` becomes `long inactivity`.
 
 Expected notification behavior:

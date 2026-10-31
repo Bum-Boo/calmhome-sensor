@@ -97,7 +97,7 @@ tests/                  Pytest validation suite
 - Physical hardware has not been validated for every room or listed sensor; test in place before relying on alerts.
 - A `fall suspected` or `long inactivity` state can be a false positive or false negative.
 - `sensor offline` relies on the device going unavailable in Home Assistant. A radar module that stops updating while its ESP32 stays connected keeps reporting its last value and is not detected as stale.
-- Long inactivity means no recorded presence, movement, or still-presence change for the threshold while the room is occupied. Noisy presence readings count as activity and can delay it.
+- Long inactivity means no recorded presence, movement, or still-presence change for the threshold while the room is occupied. It is counted from no earlier than the last Home Assistant start or sensor dropout, because nothing is known about those periods; frequent dropouts or noisy presence readings can therefore delay it.
 - State summaries do not identify a person or explain why an event occurred.
 - Moving furniture, curtains, fans, or sensors can change detection behavior and requires retesting.
 - This project does not replace direct check-ins, professional care, smoke/CO alarms, or emergency systems.

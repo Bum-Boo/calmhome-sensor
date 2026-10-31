@@ -65,7 +65,7 @@ Then set the CalmHome mapping helpers to those entity IDs:
 
 Make the change persistent by editing the `initial:` value of each helper in `/config/packages/calmhome.yaml`, then restart Home Assistant. The helpers define `initial`, so Home Assistant resets them to the file values on every restart; a value typed only in the UI works until the next restart and is then lost. The same applies to `input_number.calmhome_long_inactivity_minutes`.
 
-If a sensor does not provide an optional entity (still presence, distance, fall, door), leave the default in place. An entity that does not exist reads as off and does not mark the sensor offline. An entity that exists but is `unavailable` does.
+If a sensor does not provide an optional entity (still presence, distance, fall, door), leave the default in place. An entity that does not exist reads as off and does not mark the sensor offline. A mapped presence, movement, still-presence, or fall entity that exists but is `unavailable` does; an unavailable door or distance entity only shows as unavailable in the diagnostics card.
 
 Use `config/entities.example.yaml` as the logical checklist. Keep `config/entities.local.yaml` private if you use it for notes; Home Assistant does not read it, but `python scripts/validate_configs.py` checks its entity ID format.
 
