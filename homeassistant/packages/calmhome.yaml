@@ -245,7 +245,8 @@ template:
         unique_id: calmhome_target_distance_mapped
         unit_of_measurement: m
         device_class: distance
-        entity_category: diagnostic
+        # Template entities do not accept entity_category; keep this in the
+        # dashboard's diagnostics card instead.
         availability: >-
           {% set mock = is_state('input_boolean.calmhome_mock_mode', 'on') %}
           {% set entity = states('input_text.calmhome_entity_target_distance') %}

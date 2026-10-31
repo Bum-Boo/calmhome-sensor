@@ -76,6 +76,29 @@ ENTITY_MAPPING_LOCAL_EXAMPLE_PATH = Path("config") / "entities.local.example.yam
 MOCK_MODE_PACKAGE_PATH = Path("homeassistant") / "packages" / "calmhome_mock.yaml"
 CORE_PACKAGE_PATH = Path("homeassistant") / "packages" / "calmhome.yaml"
 
+# Options accepted by modern `template:` entities in Home Assistant (checked against 2026.2).
+# Home Assistant rejects the whole `template:` block of a package when one entity has an
+# unknown option, which silently removes every CalmHome sensor.
+TEMPLATE_COMMON_OPTIONS = frozenset(
+    {
+        "name",
+        "unique_id",
+        "default_entity_id",
+        "icon",
+        "picture",
+        "availability",
+        "attributes",
+        "variables",
+        "state",
+        "device_class",
+        "unit_of_measurement",
+    }
+)
+TEMPLATE_ENTITY_OPTIONS = {
+    "binary_sensor": TEMPLATE_COMMON_OPTIONS | {"delay_on", "delay_off", "auto_off"},
+    "sensor": TEMPLATE_COMMON_OPTIONS | {"state_class", "last_reset"},
+}
+
 
 class CalmHomeYamlLoader(yaml.SafeLoader):
     """PyYAML loader that tolerates Home Assistant tags such as !secret."""
@@ -223,6 +246,39 @@ def validate_notification_automations(root: Path = PROJECT_ROOT) -> list[str]:
     return [f"Missing notification automation aliases: {missing}"] if missing else []
 
 
+def validate_template_entities(root: Path = PROJECT_ROOT) -> list[str]:
+    path = root / CORE_PACKAGE_PATH
+    if not path.exists():
+        return [f"Missing Home Assistant core package: {path}"]
+
+    data = load_yaml_file(path)
+    blocks = data.get("template") if isinstance(data, dict) else None
+    if not isinstance(blocks, list):
+        return [f"Core package must define a template list: {path}"]
+
+    errors: list[str] = []
+    for block in blocks:
+        if not isinstance(block, dict):
+            errors.append(f"Template block must be a mapping in {path}")
+            continue
+        for domain, entities in block.items():
+            allowed = TEMPLATE_ENTITY_OPTIONS.get(domain)
+            if allowed is None or not isinstance(entities, list):
+                continue
+            for entity in entities:
+                if not isinstance(entity, dict):
+                    errors.append(f"Template {domain} entry must be a mapping in {path}")
+                    continue
+                unknown = sorted(set(entity) - allowed)
+                if unknown:
+                    errors.append(
+                        f"Template {domain} '{entity.get('name', '?')}' has options Home Assistant rejects: {unknown}"
+                    )
+                if "state" not in entity:
+                    errors.append(f"Template {domain} '{entity.get('name', '?')}' is missing state")
+    return errors
+
+
 def validate_project(root: Path = PROJECT_ROOT) -> dict[str, Any]:
     yaml_files = iter_yaml_files(root)
     deployable_yaml_files = [
@@ -241,6 +297,7 @@ def validate_project(root: Path = PROJECT_ROOT) -> dict[str, Any]:
         "entity_mapping_errors": validate_entity_mapping_examples(root),
         "mock_mode_errors": validate_mock_mode(root),
         "notification_automation_errors": validate_notification_automations(root),
+        "template_entity_errors": validate_template_entities(root),
     }
     report["ok"] = not any(
         [
@@ -251,6 +308,7 @@ def validate_project(root: Path = PROJECT_ROOT) -> dict[str, Any]:
             report["entity_mapping_errors"],
             report["mock_mode_errors"],
             report["notification_automation_errors"],
+            report["template_entity_errors"],
         ]
     )
     return report
@@ -289,6 +347,7 @@ def main() -> int:
                 ("entity_mapping_errors", "Entity mapping errors"),
                 ("mock_mode_errors", "Mock mode errors"),
                 ("notification_automation_errors", "Notification automation errors"),
+                ("template_entity_errors", "Template entity errors"),
             ):
                 if report[key]:
                     print(f"{label}:")
