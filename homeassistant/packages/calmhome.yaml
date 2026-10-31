@@ -228,12 +228,13 @@ template:
           {% set mock_last = states('input_datetime.calmhome_mock_last_activity_time') %}
           {% set real_last = states('input_datetime.calmhome_last_activity_time_storage') %}
           {% set threshold = states('input_number.calmhome_long_inactivity_minutes') | int(120) %}
+          {#- input_datetime states are naive local times; timestamp sensors need a time zone. -#}
           {% if mock and scenario == 'long_inactivity' and mock_last not in ['unknown', 'unavailable', 'none', ''] %}
-            {{ as_datetime(mock_last).isoformat() }}
+            {{ as_local(as_datetime(mock_last)).isoformat() }}
           {% elif mock and scenario == 'long_inactivity' %}
             {{ (as_timestamp(now()) - ((threshold + 5) * 60)) | timestamp_custom('%Y-%m-%dT%H:%M:%S%z', true) }}
           {% else %}
-            {{ as_datetime(real_last).isoformat() }}
+            {{ as_local(as_datetime(real_last)).isoformat() }}
           {% endif %}
 
       - name: CalmHome Privacy Status

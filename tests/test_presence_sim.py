@@ -118,3 +118,36 @@ def test_mock_scenarios_drive_room_state() -> None:
         sim.advance(31)
         assert sim.states(ROOM) == room_state, scenario
         assert sim.errors == []
+
+
+LONG = "binary_sensor.calmhome_long_inactivity"
+LAST_ACTIVITY = "sensor.calmhome_last_activity_time"
+LONG_ALERT = "CalmHome Long Inactivity Notification"
+
+
+def test_last_activity_time_is_a_timezone_aware_timestamp() -> None:
+    sim = replay(STREAMS["one_person_still"], duration=120)
+
+    assert sim.states(LAST_ACTIVITY) not in ("unknown", "unavailable")
+    assert sim.states(LAST_ACTIVITY).endswith("+00:00")
+
+
+def test_still_person_past_threshold_raises_long_inactivity() -> None:
+    sim = replay(STREAMS["one_person_still"], duration=90 + 120 * 60 - 60)
+    assert sim.states(LONG) == "off"
+
+    sim.advance(2 * 60)
+    assert sim.states(LONG) == "on"
+    assert sim.states(ROOM) == "long inactivity"
+
+    sim.advance(6 * 60)
+    assert len(alerts(sim, LONG_ALERT)) == 1
+
+
+def test_mock_long_inactivity_shows_last_activity_time() -> None:
+    sim = CalmHomeSimulator()
+    sim.set_input("input_boolean.calmhome_mock_mode", "on")
+    sim.set_input("input_select.calmhome_mock_scenario", "long_inactivity")
+
+    assert sim.states(LAST_ACTIVITY) not in ("unknown", "unavailable")
+    assert sim.states(ROOM) == "long inactivity"
