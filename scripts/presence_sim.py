@@ -11,7 +11,8 @@ checked against Home Assistant 2026.2 (see ``scripts/ha_runtime_check.py``):
 
 - ``states()`` returns ``unknown`` for entities that do not exist.
 - ``as_datetime()`` keeps naive strings naive; ``as_local()`` treats them as local time.
-- ``as_timestamp()`` treats naive values as UTC.
+- ``as_timestamp()`` treats naive values as the operating system's local time
+  (UTC in the containers this was checked in); the simulator uses UTC.
 - A template sensor with ``device_class: timestamp`` that renders a naive
   datetime becomes ``unknown``.
 - ``input_datetime`` without a restored value starts at local midnight.
@@ -152,7 +153,9 @@ class CalmHomeSimulator:
         start: datetime = DEFAULT_START,
         time_zone: str = DEFAULT_TIME_ZONE,
         package_overrides: dict[str, Any] | None = None,
+        initial_states: dict[str, Any] | None = None,
     ) -> None:
+        """``initial_states`` are raw device states already reported when Home Assistant starts."""
         self.tz = ZoneInfo(time_zone)
         self.clock = start.replace(tzinfo=self.tz) if start.tzinfo is None else start.astimezone(self.tz)
         self.start = self.clock
@@ -160,7 +163,7 @@ class CalmHomeSimulator:
         self.templates: list[TemplateEntity] = []
         self.automations: list[Automation] = []
         self.pending: dict[str, tuple[datetime, str]] = {}
-        self.pending_for: list[tuple[datetime, Automation, dict[str, Any], str, str]] = []
+        self.pending_for: list[tuple[datetime, Automation, dict[str, Any], str, str, dict[str, Any]]] = []
         self.history: list[tuple[float, str, str]] = []
         self.notifications: list[tuple[float, str, str]] = []
         self.logbook: list[tuple[float, str]] = []
@@ -175,6 +178,10 @@ class CalmHomeSimulator:
             packages.append(package_overrides)
         for package in packages:
             self._load_package(package)
+        for entity_id, state in (initial_states or {}).items():
+            self._write(entity_id, _state_text(state))
+        self._settle()
+        self._run_event_triggers("homeassistant", "start")
         self._settle()
 
     # ------------------------------------------------------------------
@@ -291,12 +298,12 @@ class CalmHomeSimulator:
         moment = datetime.fromtimestamp(float(value), self.tz if local else timezone.utc)
         return moment.strftime(fmt)
 
-    def render(self, source: Any) -> str:
+    def render(self, source: Any, variables: dict[str, Any] | None = None) -> str:
         source = str(source)
         compiled = self._compiled.get(source)
         if compiled is None:
             compiled = self._compiled[source] = self.env.from_string(source)
-        return compiled.render().strip()
+        return compiled.render(**(variables or {})).strip()
 
     # ------------------------------------------------------------------
     # State handling
@@ -311,11 +318,10 @@ class CalmHomeSimulator:
             if attributes is not None:
                 current.attributes = attributes
             return False
-        old = current.state if current else None
         self.entities[entity_id] = EntityState(state, attributes or {}, self.clock)
         self.history.append((self.elapsed, entity_id, state))
-        if old is not None:
-            self._run_state_triggers(entity_id, old, state)
+        if current is not None:
+            self._run_state_triggers(entity_id, current, state)
         return True
 
     def _set_input_datetime(self, entity_id: str, moment: datetime) -> None:
@@ -403,32 +409,47 @@ class CalmHomeSimulator:
             return False
         return True
 
-    def _run_state_triggers(self, entity_id: str, old: str, new: str) -> None:
+    def _run_state_triggers(self, entity_id: str, old: EntityState, new: str) -> None:
         self.pending_for = [item for item in self.pending_for if not (item[3] == entity_id and item[4] != new)]
+        variables = {
+            "trigger": {
+                "platform": "state",
+                "entity_id": entity_id,
+                "from_state": old,
+                "to_state": self.entities[entity_id],
+            }
+        }
         for automation in self.automations:
             for trigger in automation.triggers:
-                if not self._trigger_matches(trigger, entity_id, old, new):
+                if not self._trigger_matches(trigger, entity_id, old.state, new):
                     continue
                 hold = _seconds(trigger.get("for"))
                 if hold:
                     self.pending_for.append(
-                        (self.clock + timedelta(seconds=hold), automation, trigger, entity_id, new)
+                        (self.clock + timedelta(seconds=hold), automation, trigger, entity_id, new, variables)
                     )
                 else:
-                    self._run_automation(automation)
+                    self._run_automation(automation, variables)
 
-    def _conditions_pass(self, automation: Automation) -> bool:
+    def _run_event_triggers(self, platform: str, event: str) -> None:
+        for automation in self.automations:
+            for trigger in automation.triggers:
+                if trigger.get("platform", trigger.get("trigger")) == platform and trigger.get("event") == event:
+                    self._run_automation(automation, {"trigger": {"platform": platform, "event": event}})
+
+    def _conditions_pass(self, automation: Automation, variables: dict[str, Any]) -> bool:
         for condition in automation.conditions:
             if condition.get("condition") == "state":
                 if self.states(condition["entity_id"]) != _state_text(condition["state"]):
                     return False
             elif condition.get("condition") == "template":
-                if not result_as_boolean(self.render(condition["value_template"])):
+                if not result_as_boolean(self.render(condition["value_template"], variables)):
                     return False
         return True
 
-    def _run_automation(self, automation: Automation) -> None:
-        if not self._conditions_pass(automation):
+    def _run_automation(self, automation: Automation, variables: dict[str, Any] | None = None) -> None:
+        variables = variables or {}
+        if not self._conditions_pass(automation, variables):
             return
         for action in automation.actions:
             service = action.get("action", action.get("service"))
@@ -436,14 +457,16 @@ class CalmHomeSimulator:
             if service == "input_datetime.set_datetime":
                 target = action.get("target", {}).get("entity_id")
                 if "timestamp" in data:
-                    moment = datetime.fromtimestamp(float(self.render(data["timestamp"])), self.tz)
+                    moment = datetime.fromtimestamp(float(self.render(data["timestamp"], variables)), self.tz)
                 else:
-                    moment = datetime.fromisoformat(self.render(data["datetime"]))
+                    moment = datetime.fromisoformat(self.render(data["datetime"], variables))
                 self._set_input_datetime(target, moment)
             elif service and service.startswith("notify."):
-                self.notifications.append((self.elapsed, automation.alias, self.render(data.get("message", ""))))
+                self.notifications.append(
+                    (self.elapsed, automation.alias, self.render(data.get("message", ""), variables))
+                )
             elif service == "logbook.log":
-                self.logbook.append((self.elapsed, self.render(data.get("message", ""))))
+                self.logbook.append((self.elapsed, self.render(data.get("message", ""), variables)))
             else:
                 self.errors.append(f"{automation.alias}: unsupported action {service}")
 
@@ -477,9 +500,9 @@ class CalmHomeSimulator:
                     self._write(entity_id, target)
             ready = [item for item in self.pending_for if item[0] <= self.clock]
             self.pending_for = [item for item in self.pending_for if item[0] > self.clock]
-            for _, automation, _, entity_id, state in ready:
+            for _, automation, _, entity_id, state, variables in ready:
                 if self.states(entity_id) == state:
-                    self._run_automation(automation)
+                    self._run_automation(automation, variables)
             self._run_time_triggers(previous)
             self._settle()
             if self.clock >= end:
