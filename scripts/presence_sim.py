@@ -32,6 +32,12 @@ from zoneinfo import ZoneInfo
 
 import jinja2
 
+if __package__ in (None, ""):
+    # Allow `python scripts/presence_sim.py` as well as `python -m scripts.presence_sim`.
+    import sys
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 from scripts.validate_configs import (
     CORE_PACKAGE_PATH,
     ENTITY_MAPPING_EXAMPLE_PATH,

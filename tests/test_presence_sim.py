@@ -261,3 +261,31 @@ def test_mock_sensor_offline_scenario() -> None:
     assert sim.states(OFFLINE) == "on"
     assert sim.states(ROOM) == "sensor offline"
     assert len(alerts(sim, OFFLINE_ALERT)) == 1
+
+
+def test_noisy_presence_flicker_counts_as_activity() -> None:
+    # Documented limitation: presence flicker (fans, curtains) refreshes the activity time.
+    storage = "input_datetime.calmhome_last_activity_time_storage"
+    before = replay(STREAMS["noisy_readings"], duration=9).states(storage)
+    after = replay(STREAMS["noisy_readings"], duration=60).states(storage)
+
+    assert after != before
+
+
+def test_cli_replays_a_stream_as_json() -> None:
+    import json
+    import subprocess
+    import sys
+
+    from scripts.validate_configs import PROJECT_ROOT
+
+    result = subprocess.run(
+        [sys.executable, str(PROJECT_ROOT / "scripts" / "presence_sim.py"), "sensor_dropout"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    payload = json.loads(result.stdout)
+
+    assert payload["template_errors"] == []
+    assert "sensor offline" in [item["state"] for item in payload["room_state_timeline"]]
