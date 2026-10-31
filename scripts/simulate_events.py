@@ -85,10 +85,10 @@ def classify_event(states: dict[str, bool]) -> str:
 
     if normalized["fall_detected"]:
         return STATE_FALL
-    if normalized["sensor_offline"]:
-        return STATE_SENSOR_OFFLINE
     if normalized["long_inactivity"] and occupied:
         return STATE_LONG_INACTIVITY
+    if normalized["sensor_offline"]:
+        return STATE_SENSOR_OFFLINE
     if normalized["door_opened"] and occupied:
         return STATE_DOOR_OPENED
     if normalized["movement_detected"]:

@@ -235,10 +235,10 @@ template:
           {% set occupied = is_state('binary_sensor.calmhome_presence_confirmed', 'on') %}
           {% if is_state('binary_sensor.calmhome_fall_suspected', 'on') %}
             fall suspected
-          {% elif is_state('binary_sensor.calmhome_sensor_offline', 'on') %}
-            sensor offline
           {% elif is_state('binary_sensor.calmhome_long_inactivity', 'on') %}
             long inactivity
+          {% elif is_state('binary_sensor.calmhome_sensor_offline', 'on') %}
+            sensor offline
           {% elif is_state('binary_sensor.calmhome_door_opened_signal', 'on') and occupied %}
             door opened
           {% elif is_state('binary_sensor.calmhome_movement_confirmed', 'on') %}
@@ -319,6 +319,32 @@ automation:
           entity_id: input_datetime.calmhome_last_activity_time_storage
         data:
           datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+
+  # Activity seen before start-up or before a dropout says nothing about what
+  # happened while CalmHome could not see the room (for example someone entering
+  # during the outage). Never measure inactivity from before that point.
+  - id: calmhome_activity_baseline
+    alias: CalmHome Activity Baseline
+    mode: queued
+    trigger:
+      - platform: homeassistant
+        event: start
+      - platform: state
+        entity_id: binary_sensor.calmhome_sensor_offline
+        from: "on"
+        to: "off"
+    action:
+      - action: input_datetime.set_datetime
+        target:
+          entity_id: input_datetime.calmhome_last_activity_time_storage
+        data:
+          timestamp: >-
+            {% set stored = state_attr('input_datetime.calmhome_last_activity_time_storage', 'timestamp') | float(0) %}
+            {% if trigger.platform == 'homeassistant' %}
+              {{ as_timestamp(now()) }}
+            {% else %}
+              {{ [stored, as_timestamp(trigger.from_state.last_changed)] | max }}
+            {% endif %}
 
   # Notification examples. Replace notify.notify with your mobile app or notifier.
   - id: calmhome_fall_suspected_notification

@@ -1,5 +1,7 @@
 """Replay synthetic radar streams through the real CalmHome package templates."""
 
+from datetime import timedelta, timezone
+
 import pytest
 
 pytest.importorskip("jinja2")
@@ -207,13 +209,12 @@ def test_short_dropout_does_not_notify() -> None:
 
 
 def test_reconnect_after_dropout_is_not_counted_as_activity() -> None:
-    storage = "input_datetime.calmhome_last_activity_time_storage"
-    last_before = replay(STREAMS["sensor_dropout"], duration=599).states(storage)
     sim = replay(STREAMS["sensor_dropout"], duration=1200)
 
-    assert sim.states(storage) == last_before
-    # Last real activity was the movement that ended at t=30.
-    sim.advance(30 + 120 * 60 - sim.elapsed + 60)
+    # The reconnect at t=900 is not activity; inactivity is counted from the
+    # start of the outage (t=600), because nothing is known about the outage.
+    assert sim.states(LAST_ACTIVITY) == (sim.start + timedelta(seconds=600)).astimezone(timezone.utc).isoformat()
+    sim.advance(600 + 120 * 60 - sim.elapsed + 60)
     assert sim.states(LONG) == "on"
 
 
@@ -289,3 +290,53 @@ def test_cli_replays_a_stream_as_json() -> None:
 
     assert payload["template_errors"] == []
     assert "sensor offline" in [item["state"] for item in payload["room_state_timeline"]]
+
+
+def boot_with(frame: dict, **kwargs) -> CalmHomeSimulator:
+    """Start Home Assistant while the device already reports these readings (unknown -> on)."""
+    mapping = load_mapping()
+    return CalmHomeSimulator(initial_states={mapping[k]: v for k, v in frame.items()}, **kwargs)
+
+
+def test_boot_with_person_already_still_does_not_alert_immediately() -> None:
+    # Fresh install in the afternoon: the activity helper starts at local midnight.
+    from datetime import datetime
+
+    still = STREAMS["one_person_still"][2][1]
+    sim = boot_with(still, start=datetime(2026, 1, 15, 14, 0, 0))
+    assert sim.states(PRESENCE) == "on"
+    assert sim.states(LONG) == "off"
+
+    sim.advance(60 * 60)
+    assert sim.states(LONG) == "off"
+    assert alerts(sim, LONG_ALERT) == []
+    # Still nobody moved: after the threshold counted from start-up it is reported.
+    sim.advance(65 * 60)
+    assert sim.states(LONG) == "on"
+
+
+def test_entry_during_dropout_is_not_judged_by_stale_activity_time() -> None:
+    # Room empty for hours, sensor offline, someone enters and sits down meanwhile.
+    stream = [
+        (0, STREAMS["empty_room"][0][1]),
+        (5 * 3600, {name: "unavailable" for name in ("presence_detected", "movement_detected", "still_presence_detected", "fall_detected", "sensor_online")}),
+        (5 * 3600 + 300, STREAMS["one_person_still"][2][1]),
+    ]
+    sim = replay(stream, duration=5 * 3600 + 400)
+
+    assert sim.states(PRESENCE) == "on"
+    assert sim.states(LONG) == "off"
+    assert sim.states(ROOM) == "presence detected"
+
+    # The outage counts toward inactivity: alert 120 min after the dropout started.
+    sim.advance(5 * 3600 + 121 * 60 - sim.elapsed)
+    assert sim.states(LONG) == "on"
+
+
+def test_long_inactivity_is_not_hidden_by_offline_fall_sensor() -> None:
+    sim = replay(STREAMS["one_person_still"], duration=90 + 125 * 60)
+    assert sim.states(LONG) == "on"
+
+    sim.set_state(load_mapping()["fall_detected"], "unavailable")
+    assert sim.states(OFFLINE) == "on"
+    assert sim.states(ROOM) == "long inactivity"

@@ -11,13 +11,14 @@ large, so install it in a separate virtual environment:
 
 It uses a temporary config directory, synthetic entity states only, no network
 integrations and no notifier (notify.notify calls are captured by a stub
-service). It takes about 10 seconds because it waits for real debounce delays.
+service). It boots Home Assistant twice (once in a subprocess) and takes about 20 seconds because it waits for real debounce delays.
 """
 
 from __future__ import annotations
 
 import asyncio
 import shutil
+import subprocess
 import sys
 import tempfile
 import time
@@ -50,7 +51,7 @@ DEVICE = {
 }
 
 
-async def run(config_dir: Path) -> list[tuple[str, bool, str]]:
+async def run(config_dir: Path, boot_occupied: bool = False) -> list[tuple[str, bool, str]]:
     from homeassistant import bootstrap, runner
     from homeassistant.exceptions import HomeAssistantError
 
@@ -63,6 +64,10 @@ async def run(config_dir: Path) -> list[tuple[str, bool, str]]:
         notifications.append(call.data.get("message", ""))
 
     hass.services.async_register("notify", "notify", fake_notify)
+    if boot_occupied:
+        # The device already reports a still person when Home Assistant starts.
+        for key, value in {"online": "on", "presence": "on", "still": "on", "movement": "off", "fall": "off"}.items():
+            hass.states.async_set(DEVICE[key], value)
     await hass.async_start()
     await hass.async_block_till_done()
 
@@ -96,6 +101,14 @@ async def run(config_dir: Path) -> list[tuple[str, bool, str]]:
         await hass.services.async_call("homeassistant", "update_entity", {"entity_id": [LAST, LONG]}, blocking=True)
         await hass.async_block_till_done()
 
+    if boot_occupied:
+        await asyncio.sleep(0.5)
+        await hass.services.async_call("homeassistant", "update_entity", {"entity_id": [LAST, LONG]}, blocking=True)
+        await hass.async_block_till_done()
+        check("start-up with a still person is not long inactivity", state(ROOM) == "presence detected")
+        await hass.async_stop()
+        return results
+
     check("room state sensor exists", state(ROOM) is not None)
     check("never-connected sensor is reported offline", state(ROOM) == "sensor offline")
 
@@ -120,16 +133,31 @@ async def run(config_dir: Path) -> list[tuple[str, bool, str]]:
     await device(movement="off")
     await asyncio.sleep(2.5)
     await last_activity(3 * 3600)
-    stored = state(STORAGE)
     await device(online="off", presence="unavailable", movement="unavailable", still="unavailable", fall="unavailable")
     check("dropout is sensor offline, not stable", state(ROOM) == "sensor offline")
+    offline_since = hass.states.get(OFFLINE).last_changed.timestamp()
+    await asyncio.sleep(2)
     await device(online="on", presence="on", movement="off", still="on", fall="off")
-    check("reconnect is not recorded as activity", state(STORAGE) == stored)
-    check("long inactivity survives a dropout", state(LONG) == "on")
+    stored = hass.states.get(STORAGE).attributes.get("timestamp", 0)
+    check(
+        "reconnect is not activity; inactivity counts from the outage start",
+        abs(stored - offline_since) < 1.5,
+    )
 
+    await last_activity(3 * 3600)
     await device(fall="unavailable")
+    check("offline fall sensor does not hide long inactivity", state(OFFLINE) == "on" and state(ROOM) == "long inactivity")
+    await last_activity(0)
     check("unavailable fall sensor is sensor offline", state(OFFLINE) == "on" and state(ROOM) == "sensor offline")
     await device(fall="off")
+
+    await device(presence="off", movement="off", still="off")
+    await last_activity(5 * 3600)
+    await device(online="off", presence="unavailable", movement="unavailable", still="unavailable", fall="unavailable")
+    await device(online="on", presence="on", movement="off", still="on", fall="off")
+    await hass.services.async_call("homeassistant", "update_entity", {"entity_id": [LAST, LONG]}, blocking=True)
+    await hass.async_block_till_done()
+    check("entry during a dropout is not judged by stale activity", state(LONG) == "off")
 
     await device(presence="off", movement="off", still="off")
     await asyncio.sleep(2.5)
@@ -164,6 +192,18 @@ async def run(config_dir: Path) -> list[tuple[str, bool, str]]:
     return results
 
 
+def run_in_temp_config(boot_occupied: bool) -> list[tuple[str, bool, str]]:
+    config_dir = Path(tempfile.mkdtemp(prefix="calmhome-ha-"))
+    (config_dir / "packages").mkdir()
+    (config_dir / "configuration.yaml").write_text(CONFIGURATION, encoding="utf-8")
+    for name in ("calmhome.yaml", "calmhome_mock.yaml"):
+        shutil.copy(PROJECT_ROOT / "homeassistant" / "packages" / name, config_dir / "packages" / name)
+    try:
+        return asyncio.run(run(config_dir, boot_occupied=boot_occupied))
+    finally:
+        shutil.rmtree(config_dir, ignore_errors=True)
+
+
 def main() -> int:
     try:
         import homeassistant  # noqa: F401
@@ -171,20 +211,24 @@ def main() -> int:
         print("homeassistant is not installed; see the module docstring.", file=sys.stderr)
         return 2
 
-    config_dir = Path(tempfile.mkdtemp(prefix="calmhome-ha-"))
-    (config_dir / "packages").mkdir()
-    (config_dir / "configuration.yaml").write_text(CONFIGURATION, encoding="utf-8")
-    for name in ("calmhome.yaml", "calmhome_mock.yaml"):
-        shutil.copy(PROJECT_ROOT / "homeassistant" / "packages" / name, config_dir / "packages" / name)
-    try:
-        results = asyncio.run(run(config_dir))
-    finally:
-        shutil.rmtree(config_dir, ignore_errors=True)
+    if "--boot-occupied" in sys.argv:
+        # Home Assistant can be started only once per process.
+        results = run_in_temp_config(boot_occupied=True)
+    else:
+        results = run_in_temp_config(boot_occupied=False)
+        child = subprocess.run(
+            [sys.executable, __file__, "--boot-occupied"], capture_output=True, text=True, check=False
+        )
+        lines = [line for line in child.stdout.splitlines() if line.startswith(("PASS", "FAIL"))]
+        if not lines:
+            print(child.stderr[-2000:], file=sys.stderr)
+            lines = ["FAIL  start-up run did not report results"]
+        results += [(line[6:], line.startswith("PASS"), "") for line in lines]
 
     failed = 0
     for name, ok, detail in results:
         failed += not ok
-        print(f"{'PASS' if ok else 'FAIL'}  {name}" + ("" if ok else f"  ({detail})"))
+        print(f"{'PASS' if ok else 'FAIL'}  {name}" + ("" if ok or not detail else f"  ({detail})"))
     print(f"{len(results) - failed} passed, {failed} failed")
     return 1 if failed else 0
 
