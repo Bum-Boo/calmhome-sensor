@@ -74,6 +74,7 @@ REQUIRED_DOC_PATHS = (
 
 ENTITY_MAPPING_EXAMPLE_PATH = Path("config") / "entities.example.yaml"
 ENTITY_MAPPING_LOCAL_EXAMPLE_PATH = Path("config") / "entities.local.example.yaml"
+ENTITY_MAPPING_LOCAL_PATH = Path("config") / "entities.local.yaml"
 MOCK_MODE_PACKAGE_PATH = Path("homeassistant") / "packages" / "calmhome_mock.yaml"
 CORE_PACKAGE_PATH = Path("homeassistant") / "packages" / "calmhome.yaml"
 
@@ -134,6 +135,31 @@ def load_yaml_file(path: Path) -> Any:
         return yaml.load(handle, Loader=CalmHomeYamlLoader)
 
 
+ENTITY_ID_PATTERN = re.compile(r"^[a-z0-9_]+\.[a-z0-9_]+$")
+LOGICAL_ENTITY_DOMAINS = {name: "binary_sensor" for name in EXPECTED_LOGICAL_ENTITY_NAMES} | {
+    "target_distance": "sensor"
+}
+
+
+def load_yaml_mapping(path: Path, label: str) -> tuple[dict[str, Any], list[str]]:
+    """Load a YAML file that must be a mapping, returning errors instead of raising."""
+    if not path.exists():
+        return {}, [f"Missing {label}: {path}"]
+    try:
+        data = load_yaml_file(path)
+    except yaml.YAMLError as exc:
+        return {}, [f"{label} could not be parsed: {path}: {exc}"]
+    if not isinstance(data, dict):
+        return {}, [f"{label} must be a YAML mapping: {path}"]
+    return data, []
+
+
+def section(data: dict[str, Any], key: str, kind: type) -> Any:
+    """Return a top-level section, treating an empty or wrongly typed one as empty."""
+    value = data.get(key)
+    return value if isinstance(value, kind) else kind()
+
+
 def validate_yaml_files(files: Iterable[Path]) -> list[str]:
     errors: list[str] = []
     for path in files:
@@ -180,13 +206,9 @@ def validate_required_docs(root: Path = PROJECT_ROOT) -> list[str]:
 
 
 def validate_mapping_file(path: Path) -> list[str]:
-    errors: list[str] = []
-    if not path.exists():
-        return [f"Missing entity mapping example: {path}"]
-
-    data = load_yaml_file(path)
-    if not isinstance(data, dict):
-        return [f"Entity mapping file must be a YAML mapping: {path}"]
+    data, errors = load_yaml_mapping(path, "entity mapping file")
+    if errors:
+        return errors
 
     logical_entities = data.get("logical_entities")
     if not isinstance(logical_entities, dict):
@@ -196,6 +218,13 @@ def validate_mapping_file(path: Path) -> list[str]:
         value = logical_entities.get(name)
         if not isinstance(value, str) or not value.strip():
             errors.append(f"Entity mapping '{name}' must be a non-empty string in {path}")
+            continue
+        if not ENTITY_ID_PATTERN.match(value):
+            errors.append(f"Entity mapping '{name}' is not a valid entity ID ('{value}') in {path}")
+            continue
+        domain = LOGICAL_ENTITY_DOMAINS[name]
+        if not value.startswith(f"{domain}."):
+            errors.append(f"Entity mapping '{name}' must be a {domain}.* entity, got '{value}' in {path}")
 
     extra = sorted(set(logical_entities) - set(EXPECTED_LOGICAL_ENTITY_NAMES))
     if extra:
@@ -205,31 +234,33 @@ def validate_mapping_file(path: Path) -> list[str]:
 
 
 def validate_entity_mapping_examples(root: Path = PROJECT_ROOT) -> list[str]:
-    return validate_mapping_file(root / ENTITY_MAPPING_EXAMPLE_PATH) + validate_mapping_file(
+    errors = validate_mapping_file(root / ENTITY_MAPPING_EXAMPLE_PATH) + validate_mapping_file(
         root / ENTITY_MAPPING_LOCAL_EXAMPLE_PATH
     )
+    # The private, git-ignored mapping is optional, but check it when the user has created it.
+    local = root / ENTITY_MAPPING_LOCAL_PATH
+    if local.exists():
+        errors += validate_mapping_file(local)
+    return errors
 
 
 def validate_mock_mode(root: Path = PROJECT_ROOT) -> list[str]:
     path = root / MOCK_MODE_PACKAGE_PATH
-    if not path.exists():
-        return [f"Missing Home Assistant mock mode package: {path}"]
+    data, errors = load_yaml_mapping(path, "Home Assistant mock mode package")
+    if errors:
+        return errors
 
-    errors: list[str] = []
-    data = load_yaml_file(path)
-    if not isinstance(data, dict):
-        return [f"Mock mode package must be a YAML mapping: {path}"]
-
-    if "calmhome_mock_mode" not in data.get("input_boolean", {}):
+    if "calmhome_mock_mode" not in section(data, "input_boolean", dict):
         errors.append("Mock mode package must define input_boolean.calmhome_mock_mode")
 
-    scenario = data.get("input_select", {}).get("calmhome_mock_scenario", {})
-    options = scenario.get("options", []) if isinstance(scenario, dict) else []
+    scenario = section(data, "input_select", dict).get("calmhome_mock_scenario")
+    options = scenario.get("options") if isinstance(scenario, dict) else None
+    options = options if isinstance(options, list) else []
     missing = [option for option in REQUIRED_MOCK_SCENARIOS if option not in options]
     if missing:
         errors.append(f"Mock scenario selector is missing options: {missing}")
 
-    if "calmhome_mock_last_activity_time" not in data.get("input_datetime", {}):
+    if "calmhome_mock_last_activity_time" not in section(data, "input_datetime", dict):
         errors.append("Mock mode package must define input_datetime.calmhome_mock_last_activity_time")
 
     return errors
@@ -237,11 +268,11 @@ def validate_mock_mode(root: Path = PROJECT_ROOT) -> list[str]:
 
 def validate_notification_automations(root: Path = PROJECT_ROOT) -> list[str]:
     path = root / CORE_PACKAGE_PATH
-    if not path.exists():
-        return [f"Missing Home Assistant core package: {path}"]
+    data, errors = load_yaml_mapping(path, "Home Assistant core package")
+    if errors:
+        return errors
 
-    data = load_yaml_file(path)
-    automations = data.get("automation", []) if isinstance(data, dict) else []
+    automations = section(data, "automation", list)
     aliases = {item.get("alias") for item in automations if isinstance(item, dict)}
     missing = [alias for alias in REQUIRED_NOTIFICATION_ALIASES if alias not in aliases]
     return [f"Missing notification automation aliases: {missing}"] if missing else []
@@ -249,15 +280,14 @@ def validate_notification_automations(root: Path = PROJECT_ROOT) -> list[str]:
 
 def validate_template_entities(root: Path = PROJECT_ROOT) -> list[str]:
     path = root / CORE_PACKAGE_PATH
-    if not path.exists():
-        return [f"Missing Home Assistant core package: {path}"]
+    data, errors = load_yaml_mapping(path, "Home Assistant core package")
+    if errors:
+        return errors
 
-    data = load_yaml_file(path)
-    blocks = data.get("template") if isinstance(data, dict) else None
+    blocks = data.get("template")
     if not isinstance(blocks, list):
         return [f"Core package must define a template list: {path}"]
 
-    errors: list[str] = []
     for block in blocks:
         if not isinstance(block, dict):
             errors.append(f"Template block must be a mapping in {path}")
