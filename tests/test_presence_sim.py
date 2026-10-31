@@ -179,3 +179,85 @@ def test_movement_ending_counts_as_activity_without_still_sensor() -> None:
     assert sim.states(PRESENCE) == "on"
     assert sim.states(LONG) == "off"
     assert sim.states(ROOM) == "presence detected"
+
+
+OFFLINE = "binary_sensor.calmhome_sensor_offline"
+OFFLINE_ALERT = "CalmHome Sensor Offline Notification"
+
+
+def test_sensor_dropout_is_shown_as_offline_not_stable() -> None:
+    sim = replay(STREAMS["sensor_dropout"], duration=899)
+
+    assert sim.states(OFFLINE) == "on"
+    assert sim.states(ROOM) == "sensor offline"
+    assert not sim.seen(ROOM, "stable", since=600)
+    assert alerts(sim, OFFLINE_ALERT) == [780.0]
+
+    sim = replay(STREAMS["sensor_dropout"], duration=1200)
+    assert sim.states(OFFLINE) == "off"
+    assert sim.states(ROOM) == "presence detected"
+
+
+def test_short_dropout_does_not_notify() -> None:
+    stream = STREAMS["sensor_dropout"][:3] + [(700, STREAMS["sensor_dropout"][3][1])]
+    sim = replay(stream, duration=1200)
+
+    assert sim.seen(ROOM, "sensor offline")
+    assert alerts(sim, OFFLINE_ALERT) == []
+
+
+def test_reconnect_after_dropout_is_not_counted_as_activity() -> None:
+    storage = "input_datetime.calmhome_last_activity_time_storage"
+    last_before = replay(STREAMS["sensor_dropout"], duration=599).states(storage)
+    sim = replay(STREAMS["sensor_dropout"], duration=1200)
+
+    assert sim.states(storage) == last_before
+    # Last real activity was the movement that ended at t=30.
+    sim.advance(30 + 120 * 60 - sim.elapsed + 60)
+    assert sim.states(LONG) == "on"
+
+
+def test_unavailable_fall_sensor_is_reported_offline() -> None:
+    sim = replay(STREAMS["fall_sensor_offline"], duration=60)
+
+    assert sim.states("binary_sensor.calmhome_fall_signal") == "unavailable"
+    assert sim.states(OFFLINE) == "on"
+    assert sim.states(ROOM) == "sensor offline"
+
+
+def test_unmapped_or_never_connected_sensor_is_not_shown_as_stable() -> None:
+    sim = CalmHomeSimulator()
+
+    assert sim.states(OFFLINE) == "on"
+    assert sim.states(ROOM) == "sensor offline"
+
+
+def test_missing_optional_door_sensor_does_not_mark_sensor_offline() -> None:
+    # No door contact installed: its entity simply does not exist.
+    stream = [(0, {k: v for k, v in STREAMS["one_person_still"][2][1].items() if k != "door_opened"})]
+    sim = replay(stream, duration=60)
+
+    assert sim.states("binary_sensor.calmhome_door_opened") == "unknown"
+    assert sim.states(OFFLINE) == "off"
+    assert sim.states(ROOM) == "presence detected"
+
+
+def test_fall_reported_before_dropout_is_kept_on_screen() -> None:
+    stream = STREAMS["fall_like"][:2] + [(70, {"sensor_online": "off", "presence_detected": "unavailable", "fall_detected": "unavailable"})]
+    sim = replay(stream, duration=80)
+
+    assert alerts(sim, FALL_ALERT) == [60.0]
+    assert sim.states(ROOM) == "fall suspected"
+    sim.advance(60)
+    assert sim.states(ROOM) == "sensor offline"
+
+
+def test_mock_sensor_offline_scenario() -> None:
+    sim = CalmHomeSimulator()
+    sim.set_input("input_boolean.calmhome_mock_mode", "on")
+    sim.set_input("input_select.calmhome_mock_scenario", "sensor_offline")
+    sim.advance(4 * 60)
+
+    assert sim.states(OFFLINE) == "on"
+    assert sim.states(ROOM) == "sensor offline"
+    assert len(alerts(sim, OFFLINE_ALERT)) == 1

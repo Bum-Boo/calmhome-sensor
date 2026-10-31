@@ -40,6 +40,7 @@ REQUIRED_MOCK_SCENARIOS = (
     "fall_suspected",
     "long_inactivity",
     "door_opened",
+    "sensor_offline",
 )
 
 REQUIRED_NOTIFICATION_ALIASES = (

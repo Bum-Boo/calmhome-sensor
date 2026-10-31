@@ -17,6 +17,7 @@ input_select:
       - fall_suspected
       - long_inactivity
       - door_opened
+      - sensor_offline
     initial: room_empty
     icon: mdi:playlist-check
 

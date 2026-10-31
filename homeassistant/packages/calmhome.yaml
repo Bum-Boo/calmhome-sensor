@@ -69,6 +69,12 @@ template:
       - name: CalmHome Presence Signal
         unique_id: calmhome_presence_signal
         device_class: occupancy
+        # A mapped entity that is unavailable means the device dropped off; report that
+        # instead of a plain off so it is not mistaken for an empty room or new activity.
+        # The other signals below use the same availability rule.
+        availability: >-
+          {% set entity = states('input_text.calmhome_entity_presence_detected') %}
+          {{ is_state('input_boolean.calmhome_mock_mode', 'on') or states(entity) != 'unavailable' }}
         state: >-
           {% set mock = is_state('input_boolean.calmhome_mock_mode', 'on') %}
           {% set scenario = states('input_select.calmhome_mock_scenario') %}
@@ -82,6 +88,9 @@ template:
       - name: CalmHome Movement Signal
         unique_id: calmhome_movement_signal
         device_class: motion
+        availability: >-
+          {% set entity = states('input_text.calmhome_entity_movement_detected') %}
+          {{ is_state('input_boolean.calmhome_mock_mode', 'on') or states(entity) != 'unavailable' }}
         state: >-
           {% set mock = is_state('input_boolean.calmhome_mock_mode', 'on') %}
           {% set scenario = states('input_select.calmhome_mock_scenario') %}
@@ -95,6 +104,9 @@ template:
       - name: CalmHome Still Presence Signal
         unique_id: calmhome_still_presence_signal
         device_class: occupancy
+        availability: >-
+          {% set entity = states('input_text.calmhome_entity_still_presence_detected') %}
+          {{ is_state('input_boolean.calmhome_mock_mode', 'on') or states(entity) != 'unavailable' }}
         state: >-
           {% set mock = is_state('input_boolean.calmhome_mock_mode', 'on') %}
           {% set scenario = states('input_select.calmhome_mock_scenario') %}
@@ -108,6 +120,9 @@ template:
       - name: CalmHome Fall Signal
         unique_id: calmhome_fall_signal
         device_class: safety
+        availability: >-
+          {% set entity = states('input_text.calmhome_entity_fall_detected') %}
+          {{ is_state('input_boolean.calmhome_mock_mode', 'on') or states(entity) != 'unavailable' }}
         state: >-
           {% set mock = is_state('input_boolean.calmhome_mock_mode', 'on') %}
           {% set scenario = states('input_select.calmhome_mock_scenario') %}
@@ -121,6 +136,9 @@ template:
       - name: CalmHome Door Opened Signal
         unique_id: calmhome_door_opened_signal
         device_class: door
+        availability: >-
+          {% set entity = states('input_text.calmhome_entity_door_opened') %}
+          {{ is_state('input_boolean.calmhome_mock_mode', 'on') or states(entity) != 'unavailable' }}
         state: >-
           {% set mock = is_state('input_boolean.calmhome_mock_mode', 'on') %}
           {% set scenario = states('input_select.calmhome_mock_scenario') %}
@@ -138,12 +156,23 @@ template:
           {% set mock = is_state('input_boolean.calmhome_mock_mode', 'on') %}
           {% set entity = states('input_text.calmhome_entity_sensor_online') %}
           {% set valid = entity not in ['unknown', 'unavailable', 'none', ''] %}
-          {{ mock or (valid and is_state(entity, 'on')) }}
+          {% set scenario = states('input_select.calmhome_mock_scenario') %}
+          {{
+            (mock and scenario != 'sensor_offline')
+            or (not mock and valid and is_state(entity, 'on'))
+          }}
 
       - name: CalmHome Sensor Offline
         unique_id: calmhome_sensor_offline
         device_class: problem
-        state: "{{ not is_state('binary_sensor.calmhome_sensor_online_signal', 'on') }}"
+        state: >-
+          {{
+            not is_state('binary_sensor.calmhome_sensor_online_signal', 'on')
+            or is_state('binary_sensor.calmhome_presence_signal', 'unavailable')
+            or is_state('binary_sensor.calmhome_movement_signal', 'unavailable')
+            or is_state('binary_sensor.calmhome_still_presence_signal', 'unavailable')
+            or is_state('binary_sensor.calmhome_fall_signal', 'unavailable')
+          }}
 
       - name: CalmHome Movement Confirmed
         unique_id: calmhome_movement_confirmed
@@ -203,6 +232,8 @@ template:
           {% set occupied = is_state('binary_sensor.calmhome_presence_confirmed', 'on') %}
           {% if is_state('binary_sensor.calmhome_fall_suspected', 'on') %}
             fall suspected
+          {% elif is_state('binary_sensor.calmhome_sensor_offline', 'on') %}
+            sensor offline
           {% elif is_state('binary_sensor.calmhome_long_inactivity', 'on') %}
             long inactivity
           {% elif is_state('binary_sensor.calmhome_door_opened_signal', 'on') and occupied %}
@@ -271,6 +302,8 @@ automation:
           - binary_sensor.calmhome_presence_signal
           - binary_sensor.calmhome_movement_signal
           - binary_sensor.calmhome_still_presence_signal
+        # from "off" so a device reconnecting (unavailable -> on) is not counted as activity.
+        from: "off"
         to: "on"
       # The moment movement stops is the last time activity was seen.
       - platform: state
