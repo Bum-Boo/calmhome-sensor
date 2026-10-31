@@ -59,7 +59,7 @@ async def run(config_dir: Path) -> list[tuple[str, bool, str]]:
     )
     notifications: list[str] = []
 
-    async def fake_notify(call) -> None:  # noqa: ANN001 - Home Assistant ServiceCall
+    async def fake_notify(call) -> None:  # call: Home Assistant ServiceCall
         notifications.append(call.data.get("message", ""))
 
     hass.services.async_register("notify", "notify", fake_notify)
@@ -69,7 +69,7 @@ async def run(config_dir: Path) -> list[tuple[str, bool, str]]:
     results: list[tuple[str, bool, str]] = []
     room_history: list[str] = []
 
-    def on_change(event) -> None:  # noqa: ANN001 - Home Assistant Event
+    def on_change(event) -> None:  # event: Home Assistant Event
         if event.data["entity_id"] == ROOM and event.data["new_state"] is not None:
             room_history.append(event.data["new_state"].state)
 
