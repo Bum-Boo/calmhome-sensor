@@ -30,7 +30,10 @@ from pathlib import Path
 from typing import Any, Callable
 from zoneinfo import ZoneInfo
 
-import jinja2
+try:
+    import jinja2
+except ImportError as exc:
+    raise SystemExit("presence_sim.py needs Jinja2: python -m pip install Jinja2") from exc
 
 if __package__ in (None, ""):
     # Allow `python scripts/presence_sim.py` as well as `python -m scripts.presence_sim`.
