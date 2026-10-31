@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Emit simulated calmhome-sensor Home Assistant event sequences as JSON."""
+"""Emit simulated calmhome-sensor Home Assistant event sequences as JSON.
+
+Each event lists already-confirmed (debounced) states and the room state the
+package would show for them. For timing-accurate replays of raw sensor readings
+through the package templates (debounce, delays, dropouts) use
+``scripts/presence_sim.py``.
+"""
 
 from __future__ import annotations
 
@@ -15,6 +21,7 @@ STATE_MOVEMENT = "movement detected"
 STATE_FALL = "fall suspected"
 STATE_LONG_INACTIVITY = "long inactivity"
 STATE_DOOR_OPENED = "door opened"
+STATE_SENSOR_OFFLINE = "sensor offline"
 
 DEFAULT_STATES: dict[str, bool] = {
     "presence_detected": False,
@@ -23,6 +30,7 @@ DEFAULT_STATES: dict[str, bool] = {
     "fall_detected": False,
     "long_inactivity": False,
     "door_opened": False,
+    "sensor_offline": False,
 }
 
 SEQUENCES: dict[str, list[dict[str, Any]]] = {
@@ -59,6 +67,10 @@ SEQUENCES: dict[str, list[dict[str, Any]]] = {
         {"offset_s": 0, "states": {"presence_detected": True}},
         {"offset_s": 4, "states": {"presence_detected": True, "door_opened": True}},
     ],
+    "sensor_dropout": [
+        {"offset_s": 0, "states": {"presence_detected": True}},
+        {"offset_s": 600, "states": {"sensor_offline": True}},
+    ],
 }
 
 
@@ -73,6 +85,8 @@ def classify_event(states: dict[str, bool]) -> str:
 
     if normalized["fall_detected"]:
         return STATE_FALL
+    if normalized["sensor_offline"]:
+        return STATE_SENSOR_OFFLINE
     if normalized["long_inactivity"] and occupied:
         return STATE_LONG_INACTIVITY
     if normalized["door_opened"] and occupied:
