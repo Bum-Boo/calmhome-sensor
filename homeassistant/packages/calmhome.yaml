@@ -4,8 +4,11 @@
 # ---------------------------------------------------------------------------
 # Entity mapping helpers
 # ---------------------------------------------------------------------------
-# Replace these defaults in the UI or edit this file to match your own entity IDs.
-# Use config/entities.example.yaml as the logical mapping checklist.
+# Edit the `initial:` values in this file to match your own entity IDs.
+# Because `initial` is set, Home Assistant resets these helpers (and the
+# inactivity threshold below) to the file values on every restart, so changes
+# made only in the UI are lost. Use config/entities.example.yaml as the
+# logical mapping checklist.
 input_text:
   calmhome_entity_presence_detected:
     name: CalmHome Entity Presence Detected

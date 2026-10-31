@@ -16,7 +16,7 @@ flowchart LR
   T --> N["Phone notification"]
 ```
 
-No cameras or microphones. You can try every state in mock mode before buying any hardware.
+No cameras or microphones. You can try every state, including sensor offline, in mock mode before buying any hardware.
 
 ## Privacy and safety boundaries
 
@@ -31,31 +31,48 @@ See [the privacy model](docs/PRIVACY.md) and [runtime test plan](docs/RUNTIME_TE
 
 ## Requirements
 
-- A Home Assistant host (for example, Home Assistant Green, a Raspberry Pi, or a mini PC)
-- An ESPHome-compatible presence sensor; supported examples are documented in [the hardware guide](docs/HARDWARE.md)
-- Optional fall-status, PIR, or door-contact sensors
-- Python 3 with the packages in `requirements.txt` for local validation
+What you need depends on how far you go:
 
-Real hardware behavior depends on sensor placement, room layout, firmware, and calibration. The repository includes mock mode so you can test without physical sensors first.
+| Step | Needs |
+| --- | --- |
+| Validate configs, run tests and the simulators | Python 3 with `requirements.txt`; `Jinja2` for the template simulator tests |
+| Try the dashboard and automations in mock mode | A Home Assistant host (for example, Home Assistant Green, a Raspberry Pi, or a mini PC) |
+| Real room status | An ESPHome-compatible presence sensor (see [the hardware guide](docs/HARDWARE.md)); optional fall-status, PIR, or door-contact sensors |
+
+Real hardware behavior depends on sensor placement, room layout, firmware, and calibration.
 
 ## Quick start
 
+### 1. On your computer (no Home Assistant, no hardware)
+
 ```bash
 python -m pip install -r requirements.txt
+python -m pip install Jinja2   # optional: enables the template simulator and its tests
 python scripts/validate_configs.py
 python -m pytest tests
-python scripts/simulate_events.py normal_activity
 python scripts/simulate_events.py fall_suspected
+python scripts/presence_sim.py --list
+python scripts/presence_sim.py sensor_dropout
 ```
 
-Then:
+- `validate_configs.py` parses every YAML file and checks the mapping files (including your private `config/entities.local.yaml` if it exists), mock scenarios, notification automations, template options Home Assistant rejects, and privacy guardrails.
+- `simulate_events.py` prints the room state for already-debounced states.
+- `presence_sim.py` replays synthetic radar streams (empty room, still person, movement, fall-like, dropout, noisy readings, conflicting sensors) through the package's own templates with debounce and delays. Without Jinja2 those tests are skipped.
+- Optional, slower: `scripts/ha_runtime_check.py` boots a real Home Assistant core with the packages. Install `homeassistant` in a separate virtual environment first (see the script header).
 
-1. Add `homeassistant/packages/calmhome.yaml` and `homeassistant/packages/calmhome_mock.yaml` to Home Assistant.
-2. Enable mock mode and test `room_empty`, `presence_detected`, `movement_detected`, `still_presence`, `fall_suspected`, `long_inactivity`, and `door_opened`.
-3. Choose and adapt an example from `esphome/`.
-4. Copy `config/entities.local.example.yaml` to the ignored `config/entities.local.yaml`, then map real entity IDs from Home Assistant Developer Tools.
-5. Import or recreate `dashboards/calmhome_dashboard.yaml`.
-6. Follow the [Home Assistant](docs/INSTALL_HOME_ASSISTANT.md), [ESPHome](docs/INSTALL_ESPHOME.md), [placement](docs/SENSOR_PLACEMENT.md), and [runtime testing](docs/RUNTIME_TEST_PLAN.md) guides before enabling notifications.
+### 2. In Home Assistant with mock mode (no sensors yet)
+
+1. Add `homeassistant/packages/calmhome.yaml` and `homeassistant/packages/calmhome_mock.yaml` to Home Assistant ([guide](docs/INSTALL_HOME_ASSISTANT.md)), then restart.
+2. Until real sensors are mapped, the room state shows `sensor offline`. That is expected.
+3. Turn on mock mode and test `room_empty`, `presence_detected`, `movement_detected`, `still_presence`, `fall_suspected`, `long_inactivity`, `door_opened`, and `sensor_offline`.
+4. Import or recreate `dashboards/calmhome_dashboard.yaml`.
+
+### 3. With real hardware
+
+1. Choose and adapt an example from `esphome/`, then flash and add the device ([guide](docs/INSTALL_ESPHOME.md)).
+2. Find the real entity IDs in Developer Tools > States. Home Assistant usually prefixes ESPHome entity IDs with the device name, so they rarely match the package defaults.
+3. Put those IDs in the `initial:` values of the `input_text` helpers in `calmhome.yaml`. Changes made only in the UI are reset on restart. Optionally keep a private note in `config/entities.local.yaml` (copied from `config/entities.local.example.yaml`; Home Assistant does not read it, `validate_configs.py` checks it).
+4. Follow the [placement](docs/SENSOR_PLACEMENT.md) and [runtime testing](docs/RUNTIME_TEST_PLAN.md) guides before enabling notifications.
 
 PowerShell users can copy the local mapping template with:
 
@@ -79,6 +96,8 @@ tests/                  Pytest validation suite
 
 - Physical hardware has not been validated for every room or listed sensor; test in place before relying on alerts.
 - A `fall suspected` or `long inactivity` state can be a false positive or false negative.
+- `sensor offline` relies on the device going unavailable in Home Assistant. A radar module that stops updating while its ESP32 stays connected keeps reporting its last value and is not detected as stale.
+- Long inactivity means no recorded presence, movement, or still-presence change for the threshold while the room is occupied. Noisy presence readings count as activity and can delay it.
 - State summaries do not identify a person or explain why an event occurred.
 - Moving furniture, curtains, fans, or sensors can change detection behavior and requires retesting.
 - This project does not replace direct check-ins, professional care, smoke/CO alarms, or emergency systems.

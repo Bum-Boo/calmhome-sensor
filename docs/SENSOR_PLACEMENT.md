@@ -68,6 +68,6 @@ Recommendations:
 - Test seated still presence for at least 10 minutes.
 - Test walking movement for at least 30 seconds.
 - Test door opened while occupied.
-- Test sensor offline by powering down the ESPHome device briefly.
+- Test sensor offline by powering down the ESPHome device briefly; the room state should show `sensor offline`, not `stable`.
 - Enable notifications only after the dashboard states are stable.
 - Recheck after moving furniture, adding fans, or changing curtains.

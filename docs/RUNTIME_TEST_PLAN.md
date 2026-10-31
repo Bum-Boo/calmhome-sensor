@@ -2,6 +2,8 @@
 
 Run these tests in Home Assistant after installing `calmhome.yaml` and `calmhome_mock.yaml`.
 
+Tests 1-4 and 8-10 need the real sensor. Tests 5-7 and 11 use mock mode. The same scenarios are replayed with synthetic data by `python -m pytest tests` (see `scripts/presence_sim.py`), but only a test in the real room shows how your sensor behaves.
+
 Use this result format for each test:
 
 ```text
@@ -189,10 +191,70 @@ Expected Home Assistant state:
 
 - `binary_sensor.calmhome_sensor_online_signal` turns off.
 - `binary_sensor.calmhome_sensor_offline` turns on.
+- `sensor.calmhome_room_state` becomes `sensor offline` right away (not `stable`).
 
 Expected dashboard result:
 
 - Sensor offline shows on in Setup Controls.
+- Room state shows sensor offline.
+
+Expected notification behavior:
+
+- Sensor offline notification is sent after the automation delay.
+
+Pass/Fail:
+
+## 9. Dropout During Still Presence
+
+Setup:
+
+- Disable mock mode.
+- Sit still in the room until the room state is `presence detected`.
+- Unplug the ESPHome sensor for about 1 minute, then plug it back in while still seated.
+
+Expected Home Assistant state:
+
+- `sensor.calmhome_room_state` shows `sensor offline` during the dropout.
+- `input_datetime.calmhome_last_activity_time_storage` does not change when the sensor reconnects.
+
+Expected notification behavior:
+
+- No offline notification for a dropout shorter than 3 minutes.
+
+Pass/Fail:
+
+## 10. Real Long Inactivity
+
+Setup:
+
+- Disable mock mode.
+- Temporarily set the `initial:` of `input_number.calmhome_long_inactivity_minutes` to `15` and restart, or set it in the UI (it resets on restart).
+- Sit or lie still in the monitored area for at least 20 minutes.
+
+Expected Home Assistant state:
+
+- `sensor.calmhome_last_activity_time` shows a time, not `unknown`.
+- `binary_sensor.calmhome_long_inactivity` turns on about 15 minutes after the last movement.
+- `sensor.calmhome_room_state` becomes `long inactivity`.
+
+Expected notification behavior:
+
+- Long inactivity notification is sent 5 minutes after the state turns on.
+
+Pass/Fail:
+
+## 11. Mock Sensor Offline
+
+Setup:
+
+- Enable mock mode.
+- Select `sensor_offline`.
+- Wait at least 3 minutes.
+
+Expected Home Assistant state:
+
+- `binary_sensor.calmhome_sensor_offline` is on.
+- `sensor.calmhome_room_state` becomes `sensor offline`.
 
 Expected notification behavior:
 

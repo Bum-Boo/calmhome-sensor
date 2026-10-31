@@ -28,16 +28,19 @@
 
 ```bash
 python -m pip install -r requirements.txt
+python -m pip install Jinja2   # 任意: テンプレートシミュレーターとそのテストを有効にします
 python scripts/validate_configs.py
 python -m pytest tests
-python scripts/simulate_events.py normal_activity
 python scripts/simulate_events.py fall_suspected
+python scripts/presence_sim.py sensor_dropout
 ```
 
-1. `homeassistant/packages/calmhome.yaml` と `calmhome_mock.yaml` を追加します。
-2. mock mode ですべての scenario を試します。
-3. `esphome/` の例を実機に合わせます。
-4. `config/entities.local.example.yaml` を Git 除外済みの `config/entities.local.yaml` にコピーし、実 entity ID を設定します。
+上記のコマンドは Home Assistant やハードウェアなしで実行できます。`presence_sim.py` は合成レーダーストリームを package のテンプレートで再生します。
+
+1. `homeassistant/packages/calmhome.yaml` と `calmhome_mock.yaml` を追加して再起動します。実センサーを設定するまで room state は `sensor offline` と表示されますが、これは正常です。
+2. mock mode で `sensor_offline` を含むすべての scenario を試します。
+3. （ハードウェアが必要）`esphome/` の例を実機に合わせます。
+4. （ハードウェアが必要）Developer Tools > States で実 entity ID（通常はデバイス名の接頭辞付き）を確認し、`calmhome.yaml` の `input_text` helper の `initial:` に設定します。UI だけで変えた値は再起動で戻ります。`config/entities.local.yaml` は個人メモ用で、Home Assistant は読み込みません。
 5. `dashboards/calmhome_dashboard.yaml` を import または再構築します。
 6. [Home Assistant](INSTALL_HOME_ASSISTANT.md)、[ESPHome](INSTALL_ESPHOME.md)、[配置](SENSOR_PLACEMENT.md)、[実行時テスト](RUNTIME_TEST_PLAN.md)の各ガイドを完了してから通知を有効にします。
 
@@ -55,4 +58,4 @@ python scripts/simulate_events.py fall_suspected
 
 ## クレジット
 
-フォーク、デモ、記事、派生物を公開する際は、[@Bum-Boo](https://github.com/Bum-Boo) と[元のリポジトリ](https://github.com/Bum-Boo/Wifi-home-protector)への言及をお願いします。これは礼儀としてのお願いであり、追加のライセンス条件や制限ではありません。
+フォーク、デモ、記事、派生物を公開する際は、[@Bum-Boo](https://github.com/Bum-Boo) と[元のリポジトリ](https://github.com/Bum-Boo/calmhome-sensor)への言及をお願いします。これは礼儀としてのお願いであり、追加のライセンス条件や制限ではありません。

@@ -28,16 +28,19 @@
 
 ```bash
 python -m pip install -r requirements.txt
+python -m pip install Jinja2   # 可选：启用模板模拟器及其测试
 python scripts/validate_configs.py
 python -m pytest tests
-python scripts/simulate_events.py normal_activity
 python scripts/simulate_events.py fall_suspected
+python scripts/presence_sim.py sensor_dropout
 ```
 
-1. 添加 `homeassistant/packages/calmhome.yaml` 和 `calmhome_mock.yaml`。
-2. 在 mock mode 中测试全部场景。
-3. 根据实际传感器调整 `esphome/` 中的示例。
-4. 将 `config/entities.local.example.yaml` 复制为已被 Git 忽略的 `config/entities.local.yaml`，并填写真实实体 ID。
+以上命令无需 Home Assistant 或硬件即可运行。`presence_sim.py` 会把合成雷达数据流回放到软件包模板中。
+
+1. 添加 `homeassistant/packages/calmhome.yaml` 和 `calmhome_mock.yaml` 并重启。在映射真实传感器之前，房间状态显示 `sensor offline`，这是正常的。
+2. 在 mock mode 中测试包括 `sensor_offline` 在内的全部场景。
+3. （需要硬件）根据实际传感器调整 `esphome/` 中的示例。
+4. （需要硬件）在 Developer Tools > States 中查看真实实体 ID（通常带有设备名称前缀），填入 `calmhome.yaml` 中 `input_text` 辅助实体的 `initial:`。仅在 UI 中修改的值会在重启后恢复。`config/entities.local.yaml` 仅作个人备注，Home Assistant 不会读取。
 5. 导入或重建 `dashboards/calmhome_dashboard.yaml`。
 6. 完成 [Home Assistant](INSTALL_HOME_ASSISTANT.md)、[ESPHome](INSTALL_ESPHOME.md)、[布置](SENSOR_PLACEMENT.md)与[运行测试](RUNTIME_TEST_PLAN.md)指南后再启用通知。
 
@@ -55,4 +58,4 @@ python scripts/simulate_events.py fall_suspected
 
 ## 致谢与署名
 
-如果您公开分支、演示、文章或衍生作品，烦请提及 [@Bum-Boo](https://github.com/Bum-Boo) 和[原始仓库](https://github.com/Bum-Boo/Wifi-home-protector)。此项仅为礼貌性的署名请求，不构成额外的许可条件或限制。
+如果您公开分支、演示、文章或衍生作品，烦请提及 [@Bum-Boo](https://github.com/Bum-Boo) 和[原始仓库](https://github.com/Bum-Boo/calmhome-sensor)。此项仅为礼貌性的署名请求，不构成额外的许可条件或限制。

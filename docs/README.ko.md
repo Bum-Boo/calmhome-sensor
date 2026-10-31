@@ -28,16 +28,19 @@
 
 ```bash
 python -m pip install -r requirements.txt
+python -m pip install Jinja2   # 선택: 템플릿 시뮬레이터와 그 테스트를 켭니다
 python scripts/validate_configs.py
 python -m pytest tests
-python scripts/simulate_events.py normal_activity
 python scripts/simulate_events.py fall_suspected
+python scripts/presence_sim.py sensor_dropout
 ```
 
-1. `homeassistant/packages/calmhome.yaml`과 `calmhome_mock.yaml`을 추가합니다.
-2. mock mode에서 모든 시나리오를 시험합니다.
-3. `esphome/` 예시를 실제 센서에 맞게 수정합니다.
-4. `config/entities.local.example.yaml`을 Git에서 제외되는 `config/entities.local.yaml`로 복사하고 실제 엔티티 ID를 매핑합니다.
+위 명령은 Home Assistant나 하드웨어 없이 실행됩니다. `presence_sim.py`는 합성 레이더 스트림을 패키지 템플릿에 재생합니다.
+
+1. `homeassistant/packages/calmhome.yaml`과 `calmhome_mock.yaml`을 추가하고 재시작합니다. 실제 센서를 매핑하기 전에는 방 상태가 `sensor offline`으로 표시되며 정상입니다.
+2. mock mode에서 `sensor_offline`을 포함한 모든 시나리오를 시험합니다.
+3. (하드웨어 필요) `esphome/` 예시를 실제 센서에 맞게 수정합니다.
+4. (하드웨어 필요) Developer Tools > States에서 실제 엔티티 ID(보통 장치 이름 접두사가 붙음)를 확인해 `calmhome.yaml`의 `input_text` 헬퍼 `initial:` 값에 넣습니다. UI에서만 바꾼 값은 재시작하면 초기화됩니다. `config/entities.local.yaml`은 개인 메모용이며 Home Assistant가 읽지 않습니다.
 5. `dashboards/calmhome_dashboard.yaml`을 가져오거나 재구성합니다.
 6. [Home Assistant 설치](INSTALL_HOME_ASSISTANT.md), [ESPHome 설치](INSTALL_ESPHOME.md), [배치](SENSOR_PLACEMENT.md), [런타임 테스트](RUNTIME_TEST_PLAN.md)를 완료한 뒤 알림을 켭니다.
 
@@ -55,4 +58,4 @@ python scripts/simulate_events.py fall_suspected
 
 ## 출처 표기
 
-포크, 데모, 글 또는 파생 작업을 공개할 때 [@Bum-Boo](https://github.com/Bum-Boo)와 [원본 저장소](https://github.com/Bum-Boo/Wifi-home-protector)를 함께 언급해 주시면 감사하겠습니다. 이는 예의상 부탁드리는 크레딧 요청이며 추가 라이선스 조건이나 제한이 아닙니다.
+포크, 데모, 글 또는 파생 작업을 공개할 때 [@Bum-Boo](https://github.com/Bum-Boo)와 [원본 저장소](https://github.com/Bum-Boo/calmhome-sensor)를 함께 언급해 주시면 감사하겠습니다. 이는 예의상 부탁드리는 크레딧 요청이며 추가 라이선스 조건이나 제한이 아닙니다.

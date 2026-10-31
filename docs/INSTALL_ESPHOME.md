@@ -82,7 +82,9 @@ After the ESPHome device is online:
 
 In Developer Tools > States, search for the sensor names.
 
-LD2410 example entities should include:
+Home Assistant normally prefixes ESPHome entity IDs with the device name. With the example `friendly_name: CalmHome Presence`, expect IDs such as `binary_sensor.calmhome_presence_calmhome_presence_detected` rather than the short names below. Always copy the IDs you actually see.
+
+LD2410 example entities (names shown without the device prefix) should include:
 
 - `binary_sensor.calmhome_presence_detected`
 - `binary_sensor.calmhome_movement_detected`
@@ -96,7 +98,7 @@ MR60FDA2 example entities should include:
 - `binary_sensor.calmhome_fall_sensor_online`
 - a presence entity from the fall status sensor
 
-If your entity IDs differ, update the CalmHome mapping helpers in Home Assistant.
+Update the CalmHome mapping helpers to the real IDs as described in [Install In Home Assistant](INSTALL_HOME_ASSISTANT.md#5-map-real-sensor-entities). Map the online entity of the presence sensor to `sensor_online`. If you also use an MR60FDA2, CalmHome reports `sensor offline` when its fall entity becomes unavailable, even though only one online entity is mapped.
 
 ## 8. LD2450 Or Prebuilt Sensors
 
@@ -111,4 +113,6 @@ For LD2450, Apollo MSR-2, Everything Presence Lite, or another ESPHome-compatibl
    - optional distance
    - online status
 
-If a device does not expose still presence or target distance, leave the helper mapped to a placeholder and rely on the available presence/movement entities.
+If a device does not expose still presence or target distance, leave the helper mapped to a placeholder entity ID that does not exist and rely on the available presence/movement entities.
+
+The example configurations were checked with `esphome config` (ESPHome 2026.10.1) using placeholder secrets. They were not compiled or flashed in that check, and pin assignments still need to be confirmed against your board.

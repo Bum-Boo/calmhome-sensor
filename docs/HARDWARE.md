@@ -15,7 +15,7 @@ Pros:
 Setup notes:
 
 - Adopt the device in ESPHome or Home Assistant.
-- Keep entity names aligned with the package, or edit `homeassistant/packages/calmhome.yaml`.
+- Map the device's entity IDs in the `input_text` helpers of `homeassistant/packages/calmhome.yaml`.
 - Mount sensors where residents expect them and can consent to them.
 
 ### B. DIY Path: ESP32 + LD2410C/LD2450 + Optional PIR/Door Sensor
@@ -30,7 +30,7 @@ High-level wiring notes:
 - For a PIR or door contact sensor, use a GPIO suitable for digital input and configure pull-up or pull-down behavior as needed.
 - Keep wiring short and strain-relieved in an enclosure.
 
-The example `esphome/ld2410_presence_example.yaml` exposes these Home Assistant entities:
+The example `esphome/ld2410_presence_example.yaml` exposes these entities (Home Assistant usually adds the device name as a prefix, for example `binary_sensor.calmhome_presence_calmhome_presence_detected`):
 
 - `binary_sensor.calmhome_presence_detected`
 - `binary_sensor.calmhome_movement_detected`
@@ -38,7 +38,7 @@ The example `esphome/ld2410_presence_example.yaml` exposes these Home Assistant 
 - `sensor.calmhome_target_distance`
 - `binary_sensor.calmhome_sensor_online`
 
-For LD2450, use the matching ESPHome component and keep the same entity naming pattern so the Home Assistant package can stay unchanged.
+For LD2450, use the matching ESPHome component and map its entities in the CalmHome helpers.
 
 ### C. Research Path: TI IWR6843-Class Radar
 

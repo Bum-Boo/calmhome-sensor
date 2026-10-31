@@ -43,14 +43,17 @@ Expected core entities include:
 - `binary_sensor.calmhome_fall_suspected`
 - `binary_sensor.calmhome_long_inactivity`
 - `sensor.calmhome_last_activity_time`
+- `binary_sensor.calmhome_sensor_offline`
 - `input_boolean.calmhome_mock_mode`
 - `input_select.calmhome_mock_scenario`
+
+Until real sensors are mapped and online, `sensor.calmhome_room_state` shows `sensor offline`. This is expected and means CalmHome cannot see a working sensor yet.
 
 ## 5. Map Real Sensor Entities
 
 Use Developer Tools > States to find the real entities created by ESPHome.
 
-Then update the CalmHome mapping helpers:
+Then set the CalmHome mapping helpers to those entity IDs:
 
 - `input_text.calmhome_entity_presence_detected`
 - `input_text.calmhome_entity_movement_detected`
@@ -60,7 +63,11 @@ Then update the CalmHome mapping helpers:
 - `input_text.calmhome_entity_door_opened`
 - `input_text.calmhome_entity_sensor_online`
 
-Use `config/entities.example.yaml` as the logical checklist. Keep `config/entities.local.yaml` private if you use it for notes.
+Make the change persistent by editing the `initial:` value of each helper in `/config/packages/calmhome.yaml`, then restart Home Assistant. The helpers define `initial`, so Home Assistant resets them to the file values on every restart; a value typed only in the UI works until the next restart and is then lost. The same applies to `input_number.calmhome_long_inactivity_minutes`.
+
+If a sensor does not provide an optional entity (still presence, distance, fall, door), leave the default in place. An entity that does not exist reads as off and does not mark the sensor offline. An entity that exists but is `unavailable` does.
+
+Use `config/entities.example.yaml` as the logical checklist. Keep `config/entities.local.yaml` private if you use it for notes; Home Assistant does not read it, but `python scripts/validate_configs.py` checks its entity ID format.
 
 ## 6. Enable And Disable Mock Mode
 
@@ -84,6 +91,7 @@ Mock scenarios:
 - `fall_suspected`
 - `long_inactivity`
 - `door_opened`
+- `sensor_offline`
 
 ## 7. Import Or Recreate The Dashboard
 
@@ -122,6 +130,7 @@ To test:
 4. If you use mobile app notifications, replace `notify.notify` in the package with your target notify action.
 5. Enable mock mode and select `fall_suspected`. Wait 30 seconds for the recheck delay.
 6. Select `long_inactivity` and wait for the notification automation delay.
+7. Select `sensor_offline` and wait 3 minutes for the offline notification.
 
 ## 9. Safe Rollback
 
